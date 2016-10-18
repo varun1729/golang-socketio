@@ -3,8 +3,8 @@ package gosocketio
 import (
 	"encoding/json"
 	"errors"
-	"github.com/graarh/golang-socketio/protocol"
-	"github.com/graarh/golang-socketio/transport"
+	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/mtfelian/golang-socketio/transport"
 	"net/http"
 	"sync"
 	"time"
@@ -75,6 +75,11 @@ Checks that Channel is still alive
 */
 func (c *Channel) IsAlive() bool {
 	return c.alive
+}
+
+// Close закрывает соединение для клиента (канала)
+func (c *Channel) Close() error {
+	return CloseChannel(c, &c.server.methods, nil)
 }
 
 /**
