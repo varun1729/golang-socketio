@@ -18,6 +18,11 @@ const (
 	WsDefaultBufferSize     = 1024 * 32
 )
 
+// WebsocketTransportParams is a parameters for getting non-default websocket transport
+type WebsocketTransportParams struct {
+	Headers http.Header
+}
+
 var (
 	ErrorBinaryMessage     = errors.New("Binary messages are not supported")
 	ErrorBadBuffer         = errors.New("Buffer error")
@@ -137,4 +142,11 @@ func GetDefaultWebsocketTransport() *WebsocketTransport {
 
 		Headers: nil,
 	}
+}
+
+// GetWebsocketTransport returns websocket transport with additional params
+func GetWebsocketTransport(params WebsocketTransportParams) *WebsocketTransport {
+	tr := GetDefaultWebsocketTransport()
+	tr.Headers = params.Headers
+	return tr
 }
