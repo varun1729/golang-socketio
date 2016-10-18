@@ -88,11 +88,13 @@ type WebsocketTransport struct {
 	SendTimeout    time.Duration
 
 	BufferSize int
+
+	Headers http.Header
 }
 
 func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) {
 	dialer := websocket.Dialer{}
-	socket, _, err := dialer.Dial(url, nil)
+	socket, _, err := dialer.Dial(url, wst.Headers)
 	if err != nil {
 		return nil, err
 	}
@@ -132,5 +134,7 @@ func GetDefaultWebsocketTransport() *WebsocketTransport {
 		ReceiveTimeout: WsDefaultReceiveTimeout,
 		SendTimeout:    WsDefaultSendTimeout,
 		BufferSize:     WsDefaultBufferSize,
+
+		Headers: nil,
 	}
 }
