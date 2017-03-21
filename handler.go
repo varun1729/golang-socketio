@@ -2,9 +2,10 @@ package gosocketio
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/mtfelian/golang-socketio/protocol"
-	"sync"
 	"reflect"
+	"sync"
 )
 
 const (
@@ -101,6 +102,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		data := f.getArgs()
 		err := json.Unmarshal([]byte(msg.Args), &data)
 		if err != nil {
+			fmt.Println("msg.Args: %v, data: %v, err: %v", msg.Args, data, err)
 			return
 		}
 
