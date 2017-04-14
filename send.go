@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
 	"github.com/mtfelian/golang-socketio/protocol"
 )
 
@@ -44,8 +45,8 @@ Create packet based on given data and send it
 */
 func (c *Channel) Emit(method string, args interface{}) error {
 	msg := &protocol.Message{
-		Type: protocol.MessageTypeEmit,
-		Method:  method,
+		Type:   protocol.MessageTypeEmit,
+		Method: method,
 	}
 
 	return send(msg, c, args)
@@ -56,9 +57,9 @@ Create ack packet based on given data and send it and receive response
 */
 func (c *Channel) Ack(method string, args interface{}, timeout time.Duration) (string, error) {
 	msg := &protocol.Message{
-		Type: protocol.MessageTypeAckRequest,
-		AckId:   c.ack.getNextId(),
-		Method:  method,
+		Type:   protocol.MessageTypeAckRequest,
+		AckId:  c.ack.getNextId(),
+		Method: method,
 	}
 
 	waiter := make(chan string)

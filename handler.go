@@ -3,9 +3,10 @@ package gosocketio
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mtfelian/golang-socketio/protocol"
 	"reflect"
 	"sync"
+
+	"github.com/mtfelian/golang-socketio/protocol"
 )
 
 const (
