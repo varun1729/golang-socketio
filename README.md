@@ -1,9 +1,9 @@
 golang socket.io
 ================
 
-golang implementation of [socket.io](http://socket.io) library, client and server
+This library was forked from github.com/graarh/golang-socketio
 
-You can check working chat server, based on this library, at http://funstream.tv
+golang implementation of [socket.io](http://socket.io) library, client and server
 
 Examples directory contains simple client and server.
 
@@ -154,11 +154,3 @@ var socket = io('ws://yourdomain.com', {transports: ['websocket']});
 	//close connection
 	c.Close()
 ```
-
-### Roadmap
-
-1. Tests
-2. Travis CI
-3. http longpoll transport
-4. pure http (short-timed queries) transport
-5. binary format

@@ -16,6 +16,10 @@ import (
 	"github.com/mtfelian/golang-socketio/transport"
 )
 
+const (
+	HeaderForward = "X-Forwarded-For"
+)
+
 var (
 	ErrorServerNotSet       = errors.New("Server not set")
 	ErrorConnectionNotFound = errors.New("Connection not found")
@@ -42,6 +46,10 @@ type Server struct {
 Get ip of socket client
 */
 func (c *Channel) Ip() string {
+	forward := c.RequestHeader().Get(HeaderForward)
+	if forward != "" {
+		return forward
+	}
 	return c.ip
 }
 

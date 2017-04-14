@@ -3,6 +3,7 @@ package gosocketio
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/mtfelian/golang-socketio/protocol"
@@ -17,6 +18,13 @@ var (
 Send message packet to socket
 */
 func send(msg *protocol.Message, c *Channel, args interface{}) error {
+	// preventing json/encoding "index out of range" panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("socket.io send panic: ", r)
+		}
+	}()
+
 	if args != nil {
 		json, err := json.Marshal(&args)
 		if err != nil {
