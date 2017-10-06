@@ -18,44 +18,12 @@ type PollingConnection struct {
 }
 
 func (plc *PollingConnection) GetMessage() (message string, err error) {
-	plc.socket.SetReadDeadline(time.Now().Add(plc.transport.ReceiveTimeout))
-	msgType, reader, err := plc.socket.NextReader()
-	if err != nil {
-		return "", err
-	}
 
-	//support only text messages exchange
-	if msgType != websocket.TextMessage {
-		return "", ErrorBinaryMessage
-	}
-
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return "", ErrorBadBuffer
-	}
-	text := string(data)
-
-	//empty messages are not allowed
-	if len(text) == 0 {
-		return "", ErrorPacketWrong
-	}
-
-	return text, nil
+	return nil, nil
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
-	plc.socket.SetWriteDeadline(time.Now().Add(plc.transport.SendTimeout))
-	writer, err := plc.socket.NextWriter(websocket.TextMessage)
-	if err != nil {
-		return err
-	}
 
-	if _, err := writer.Write([]byte(message)); err != nil {
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
 	return nil
 }
 
