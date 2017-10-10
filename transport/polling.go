@@ -18,8 +18,8 @@ type PollingConnection struct {
 }
 
 func (plc *PollingConnection) GetMessage() (message string, err error) {
-
-	return nil, nil
+	msg <- plc.transport.IncomeMessageChan
+	return msg, nil
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
@@ -44,6 +44,8 @@ type PollingTransport struct {
 	BufferSize int
 
 	Headers http.Header
+
+	IncomeMessageChan chan string
 }
 
 func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
@@ -67,45 +69,48 @@ Websocket connection do not require any additional processing
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		if jsonp := r.URL.Query().Get("j"); jsonp != "" {
-			buf := bytes.NewBuffer(nil)
-			if err := c.Payload.FlushOut(buf); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "text/javascript; charset=UTF-8")
-			pl := template.JSEscapeString(buf.String())
-			w.Write([]byte("___eio[" + jsonp + "](\""))
-			w.Write([]byte(pl))
-			w.Write([]byte("\");"))
-			return
-		}
-		if c.supportBinary {
-			w.Header().Set("Content-Type", "application/octet-stream")
-		} else {
-			w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
-		}
-		if err := c.Payload.FlushOut(w); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		return
+		plt.get(w, r)
 	case "POST":
-		mime := r.Header.Get("Content-Type")
-		supportBinary, err := mimeSupportBinary(mime)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if err := c.Payload.FeedIn(r.Body, supportBinary); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		w.Write([]byte("ok"))
-		return
-	default:
-		http.Error(w, "invalid method", http.StatusBadRequest)
+		plt.post(w, r)
 	}
+}
+
+func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
+	if !plt.getLocker.TryLock() {
+		http.Error(w, "overlay get", http.StatusBadRequest)
+		return
+	}
+	if plt.getState() != stateNormal {
+		http.Error(w, "closed", http.StatusBadRequest)
+		return
+	}
+
+	defer func() {
+		if plt.getState() == stateClosing {
+			if plt.postLocker.TryLock() {
+				plt.setState(stateClosed)
+				plt.callback.OnClose(p)
+				plt.postLocker.Unlock()
+			}
+		}
+		plt.getLocker.Unlock()
+	}()
+
+	<-plt.sendChan
+
+	// XHR Polling
+	if plt.encoder.IsString() {
+		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+	plt.encoder.EncodeTo(w)
+
+}
+
+func (plt *PollingTransport) post(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	plt.IncomeMessageChan <- r.Body
 }
 
 /**
