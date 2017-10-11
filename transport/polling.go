@@ -15,7 +15,7 @@ type PollingTransportParams struct {
 
 type PollingConnection struct {
 	transport           *PollingTransport
-	eventsIn            chan<- string
+	eventsIn            chan string
 	SubscriptionHandler func(w http.ResponseWriter, r *http.Request)
 }
 
@@ -25,7 +25,7 @@ func (plc *PollingConnection) GetMessage() (message string, err error) {
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
-	plc <- message
+	plc.eventsIn <- message
 	return nil
 }
 
