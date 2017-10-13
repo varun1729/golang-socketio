@@ -1,12 +1,16 @@
 package transport
 
 import (
-	"errors"
+	_"errors"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"github.com/jcuga/golongpoll"
+	"strconv"
+	"log"
+	"io"
+	"fmt"
+	"encoding/json"
 )
 
 type PollingTransportParams struct {
@@ -20,7 +24,7 @@ type PollingConnection struct {
 }
 
 func (plc *PollingConnection) GetMessage() (message string, err error) {
-	msg <- plc.transport.IncomeMessageChan
+	msg := <- plc.transport.IncomeMessageChan
 	return msg, nil
 }
 
@@ -30,7 +34,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-	plc.socket.Close()
+	//plc.socket.Close()
 }
 
 func (plc *PollingConnection) PingParams() (interval, timeout time.Duration) {
@@ -57,12 +61,7 @@ func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
 func (plt *PollingTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
 
-	if r.Method != "GET" {
-		http.Error(w, upgradeFailed+ErrorMethodNotAllowed.Error(), 503)
-		return nil, ErrorMethodNotAllowed
-	}
-
-	return &PollingConnection{plt}, nil
+	return &PollingConnection{transport: plt}, nil
 }
 
 /**
@@ -78,41 +77,43 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
-	if !plt.getLocker.TryLock() {
-		http.Error(w, "overlay get", http.StatusBadRequest)
-		return
-	}
-	if plt.getState() != stateNormal {
-		http.Error(w, "closed", http.StatusBadRequest)
-		return
-	}
-
-	defer func() {
-		if plt.getState() == stateClosing {
-			if plt.postLocker.TryLock() {
-				plt.setState(stateClosed)
-				plt.callback.OnClose(p)
-				plt.postLocker.Unlock()
-			}
-		}
-		plt.getLocker.Unlock()
-	}()
-
-	<-plt.sendChan
-
-	// XHR Polling
-	if plt.encoder.IsString() {
-		w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
-	} else {
-		w.Header().Set("Content-Type", "application/octet-stream")
-	}
-	plt.encoder.EncodeTo(w)
+	//if !plt.getLocker.TryLock() {
+	//	http.Error(w, "overlay get", http.StatusBadRequest)
+	//	return
+	//}
+	//if plt.getState() != stateNormal {
+	//	http.Error(w, "closed", http.StatusBadRequest)
+	//	return
+	//}
+	//
+	//defer func() {
+	//	if plt.getState() == stateClosing {
+	//		if plt.postLocker.TryLock() {
+	//			plt.setState(stateClosed)
+	//			plt.callback.OnClose(p)
+	//			plt.postLocker.Unlock()
+	//		}
+	//	}
+	//	plt.getLocker.Unlock()
+	//}()
+	//
+	//<-plt.sendChan
+	//
+	//// XHR Polling
+	//if plt.encoder.IsString() {
+	//	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	//} else {
+	//	w.Header().Set("Content-Type", "application/octet-stream")
+	//}
+	//plt.encoder.EncodeTo(w)
 
 }
 
 func (plt *PollingTransport) post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	plt.IncomeMessageChan <- r.Body
+	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	bodyString := string(bodyBytes)
+	plt.IncomeMessageChan <- bodyString
 }
 
 /**
@@ -138,8 +139,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 // }
 
 // get web handler that has closure around sub chanel and clientTimeout channnel
-func getLongPollSubscriptionHandler(maxTimeoutSeconds int, subscriptionRequests chan clientSubscription,
-	clientTimeouts chan<- clientCategoryPair, loggingEnabled bool) func(w http.ResponseWriter, r *http.Request) {
+func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int, loggingEnabled bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		timeout, err := strconv.Atoi(r.URL.Query().Get("timeout"))
 		if loggingEnabled {
@@ -168,32 +168,32 @@ func getLongPollSubscriptionHandler(maxTimeoutSeconds int, subscriptionRequests 
 			return
 		}
 		// Default to only looking for current events
-		lastEventTime := time.Now()
+		//lastEventTime := time.Now()
 		// since_time is string of milliseconds since epoch
-		lastEventTimeParam := r.URL.Query().Get("since_time")
-		if len(lastEventTimeParam) > 0 {
-			// Client is requesting any event from given timestamp
-			// parse time
-			var parseError error
-			lastEventTime, parseError = millisecondStringToTime(lastEventTimeParam)
-			if parseError != nil {
-				if loggingEnabled {
-					log.Printf("Error parsing last_event_time arg. Parm Value: %s, Error: %s.\n",
-						lastEventTimeParam, err)
-				}
-				io.WriteString(w, "{\"error\": \"Invalid last_event_time arg.\"}")
-				return
-			}
-		}
-		subscription, err := newclientSubscription(category, lastEventTime)
-		if err != nil {
-			if loggingEnabled {
-				log.Printf("Error creating new Subscription: %s.\n", err)
-			}
-			io.WriteString(w, "{\"error\": \"Error creating new Subscription.\"}")
-			return
-		}
-		subscriptionRequests <- *subscription
+		//lastEventTimeParam := r.URL.Query().Get("since_time")
+		//if len(lastEventTimeParam) > 0 {
+		//	// Client is requesting any event from given timestamp
+		//	// parse time
+		//	var parseError error
+		//	lastEventTime, parseError = millisecondStringToTime(lastEventTimeParam)
+		//	if parseError != nil {
+		//		if loggingEnabled {
+		//			log.Printf("Error parsing last_event_time arg. Parm Value: %s, Error: %s.\n",
+		//				lastEventTimeParam, err)
+		//		}
+		//		io.WriteString(w, "{\"error\": \"Invalid last_event_time arg.\"}")
+		//		return
+		//	}
+		//}
+		//subscription, err := newclientSubscription(category, lastEventTime)
+		//if err != nil {
+		//	if loggingEnabled {
+		//		log.Printf("Error creating new Subscription: %s.\n", err)
+		//	}
+		//	io.WriteString(w, "{\"error\": \"Error creating new Subscription.\"}")
+		//	return
+		//}
+		//subscriptionRequests <- *subscription
 		// Listens for connection close and un-register subscription in the
 		// event that a client crashes or the connection goes down.  We don't
 		// need to wait around to fulfill a subscription if no one is going to
@@ -203,18 +203,18 @@ func getLongPollSubscriptionHandler(maxTimeoutSeconds int, subscriptionRequests 
 		case <-time.After(time.Duration(timeout) * time.Second):
 			// Lets the subscription manager know it can discard this request's
 			// channel.
-			clientTimeouts <- subscription.clientCategoryPair
-			timeout_resp := makeTimeoutResponse(time.Now())
-			if jsonData, err := json.Marshal(timeout_resp); err == nil {
-				io.WriteString(w, string(jsonData))
-			} else {
-				io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
-			}
-		case events := <-subscription.Events:
+			//clientTimeouts <- subscription.clientCategoryPair
+			//timeout_resp := makeTimeoutResponse(time.Now())
+			//if jsonData, err := json.Marshal(timeout_resp); err == nil {
+			//	io.WriteString(w, string(jsonData))
+			//} else {
+			//	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
+			//}
+		case events := <- EventsIn:
 			// Consume event.  Subscription manager will automatically discard
 			// this client's channel upon sending event
 			// NOTE: event is actually []Event
-			if jsonData, err := json.Marshal(eventResponse{&events}); err == nil {
+			if jsonData, err := json.Marshal(events); err == nil {
 				io.WriteString(w, string(jsonData))
 			} else {
 				io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
@@ -223,7 +223,7 @@ func getLongPollSubscriptionHandler(maxTimeoutSeconds int, subscriptionRequests 
 			// Client connection closed before any events occurred and before
 			// the timeout was exceeded.  Tell manager to forget about this
 			// client.
-			clientTimeouts <- subscription.clientCategoryPair
+			//clientTimeouts <- subscription.clientCategoryPair
 		}
 	}
 }
