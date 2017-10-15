@@ -281,7 +281,7 @@ func (s *Server) SendOpenSequence(c *Channel) {
 	if err != nil {
 		panic(err)
 	}
-
+	fmt.Println("SendOpenSequence, header ", string(jsonHdr))
 	c.out <- protocol.MustEncode(
 		&protocol.Message{
 			Type: protocol.MessageTypeOpen,
@@ -299,6 +299,7 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	requestHeader http.Header) {
 
 	interval, timeout := conn.PingParams()
+	fmt.Println("interval, timeout ", interval, timeout)
 	hdr := Header{
 		Sid:          generateNewId(remoteAddr),
 		Upgrades:     []string{},

@@ -3,6 +3,7 @@ package gosocketio
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -173,10 +174,10 @@ func outLoop(c *Channel, m *methods) error {
 		}
 
 		msg := <-c.out
+		fmt.Println("outLoop ", msg)
 		if msg == protocol.CloseMessage {
 			return nil
 		}
-
 		err := c.conn.WriteMessage(msg)
 		if err != nil {
 			return CloseChannel(c, m, err)

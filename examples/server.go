@@ -7,8 +7,10 @@ import (
 	"os"
 	"time"
 
+
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
+
 )
 
 type ChannelInner struct {
@@ -26,7 +28,7 @@ var assetsDir http.FileSystem
 
 func main() {
 	currentRoot, _ := os.Getwd()
-	assetsDir = http.Dir(currentRoot + "\\assets")
+	assetsDir = http.Dir(currentRoot + "\\examples" + "\\assets")
 	fmt.Println(assetsDir)
 
 	server := gosocketio.NewServer(transport.GetDefaultPollingTransport())

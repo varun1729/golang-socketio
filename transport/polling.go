@@ -1,16 +1,17 @@
 package transport
 
 import (
-	_"errors"
+	_ "errors"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"strconv"
-	"log"
-	"io"
+	_ "encoding/json"
 	"fmt"
-	"encoding/json"
+	_ "io"
+	"log"
+	_ "strconv"
+
 )
 
 type PollingTransportParams struct {
@@ -24,12 +25,14 @@ type PollingConnection struct {
 }
 
 func (plc *PollingConnection) GetMessage() (message string, err error) {
-	msg := <- plc.transport.IncomeMessageChan
+	msg := <-plc.transport.IncomeMessageChan
 	return msg, nil
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
+	fmt.Println("plc WriteMessage before", message)
 	plc.eventsIn <- message
+	fmt.Println("plc WriteMessage ", message)
 	return nil
 }
 
@@ -52,6 +55,8 @@ type PollingTransport struct {
 	Headers http.Header
 
 	IncomeMessageChan chan string
+
+	PollingConnection *PollingConnection
 }
 
 func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
@@ -60,20 +65,27 @@ func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
 
 func (plt *PollingTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
+	eventChan := make(chan string)
+	SubscriptionHandler := getLongPollSubscriptionHandler(eventChan, 20, true)
 
-	return &PollingConnection{transport: plt}, nil
+	plc := &PollingConnection{transport: plt, eventsIn: eventChan, SubscriptionHandler: SubscriptionHandler}
+	//go plc.SubscriptionHandler(w, r)
+	plt.PollingConnection = plc
+	return plc, nil
 }
 
 /**
 Websocket connection do not require any additional processing
 */
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		plt.get(w, r)
-	case "POST":
-		plt.post(w, r)
-	}
+	//switch r.Method {
+	//case "GET":
+	//	plt.get(w, r)
+	//case "POST":
+	//	plt.post(w, r)
+	//}
+
+	plt.PollingConnection.SubscriptionHandler(w, r)
 }
 
 func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
@@ -99,13 +111,12 @@ func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
 	//
 	//<-plt.sendChan
 	//
-	//// XHR Polling
-	//if plt.encoder.IsString() {
-	//	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
-	//} else {
-	//	w.Header().Set("Content-Type", "application/octet-stream")
-	//}
-	//plt.encoder.EncodeTo(w)
+	// XHR Polling
+
+	//w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+
+	//w.Write([]byte("97:0{\"sid\":\"il0ZOYhV67tK6MQ2AAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":60000}2:40"))
+	fmt.Println("get")
 
 }
 
@@ -114,6 +125,7 @@ func (plt *PollingTransport) post(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 	bodyString := string(bodyBytes)
 	plt.IncomeMessageChan <- bodyString
+	fmt.Println("post")
 }
 
 /**
@@ -141,7 +153,11 @@ func GetDefaultPollingTransport() *PollingTransport {
 // get web handler that has closure around sub chanel and clientTimeout channnel
 func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int, loggingEnabled bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		timeout, err := strconv.Atoi(r.URL.Query().Get("timeout"))
+		//timeout, err := strconv.Atoi(r.URL.Query().Get("timeout"))
+		timeout := 10
+
+		fmt.Println("ollSubscriptionHandler, timeout ")
+
 		if loggingEnabled {
 			log.Println("Handling HTTP request at ", r.URL)
 		}
@@ -151,22 +167,23 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
 		w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
 		w.Header().Set("Expires", "0")                                         // Proxies.
-		if err != nil || timeout > maxTimeoutSeconds || timeout < 1 {
-			if loggingEnabled {
-				log.Printf("Error: Invalid timeout param.  Must be 1-%d. Got: %q.\n",
-					maxTimeoutSeconds, r.URL.Query().Get("timeout"))
-			}
-			io.WriteString(w, fmt.Sprintf("{\"error\": \"Invalid timeout arg.  Must be 1-%d.\"}", maxTimeoutSeconds))
-			return
-		}
-		category := r.URL.Query().Get("category")
-		if len(category) == 0 || len(category) > 1024 {
-			if loggingEnabled {
-				log.Printf("Error: Invalid subscription category, must be 1-1024 characters long.\n")
-			}
-			io.WriteString(w, "{\"error\": \"Invalid subscription category, must be 1-1024 characters long.\"}")
-			return
-		}
+		// if err != nil || timeout > maxTimeoutSeconds || timeout < 1 {
+		// 	if loggingEnabled {
+		// 		log.Printf("Error: Invalid timeout param.  Must be 1-%d. Got: %q.\n",
+		// 			maxTimeoutSeconds, r.URL.Query().Get("timeout"))
+
+		// 	}
+		// 	io.WriteString(w, fmt.Sprintf("{\"error\": \"Invalid timeout arg.  Must be 1-%d.\"}", maxTimeoutSeconds))
+		// 	return
+		// }
+		// category := r.URL.Query().Get("category")
+		// if len(category) == 0 || len(category) > 1024 {
+		// 	if loggingEnabled {
+		// 		log.Printf("Error: Invalid subscription category, must be 1-1024 characters long.\n")
+		// 	}
+		// 	io.WriteString(w, "{\"error\": \"Invalid subscription category, must be 1-1024 characters long.\"}")
+		// 	return
+		// }
 		// Default to only looking for current events
 		//lastEventTime := time.Now()
 		// since_time is string of milliseconds since epoch
@@ -198,32 +215,42 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 		// event that a client crashes or the connection goes down.  We don't
 		// need to wait around to fulfill a subscription if no one is going to
 		// receive it
-		disconnectNotify := w.(http.CloseNotifier).CloseNotify()
-		select {
-		case <-time.After(time.Duration(timeout) * time.Second):
-			// Lets the subscription manager know it can discard this request's
-			// channel.
-			//clientTimeouts <- subscription.clientCategoryPair
-			//timeout_resp := makeTimeoutResponse(time.Now())
-			//if jsonData, err := json.Marshal(timeout_resp); err == nil {
-			//	io.WriteString(w, string(jsonData))
-			//} else {
-			//	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
-			//}
-		case events := <- EventsIn:
-			// Consume event.  Subscription manager will automatically discard
-			// this client's channel upon sending event
-			// NOTE: event is actually []Event
-			if jsonData, err := json.Marshal(events); err == nil {
-				io.WriteString(w, string(jsonData))
-			} else {
-				io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
+		//disconnectNotify := w.(http.CloseNotifier).CloseNotify()
+
+			select {
+			case <-time.After(time.Duration(timeout) * time.Second):
+				// Lets the subscription manager know it can discard this request's
+				// channel.
+				//clientTimeouts <- subscription.clientCategoryPair
+				//timeout_resp := makeTimeoutResponse(time.Now())
+				//if jsonData, err := json.Marshal(timeout_resp); err == nil {
+				//	io.WriteString(w, string(jsonData))
+				//} else {
+				//	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
+				//}
+				//fmt.Println("EventsIn timeout", timeout)
+			case events := <-EventsIn:
+				fmt.Println("EventsIn ", events)
+				// Consume event.  Subscription manager will automatically discard
+				// this client's channel upon sending event
+				// NOTE: event is actually []Event
+				// if jsonData, err := json.Marshal(events); err == nil {
+				// 	io.WriteString(w, string(jsonData))
+				// } else {
+				// 	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
+				// }
+
+				//io.WriteString(w, events+"40")
+				//w.Write([]byte("97:0{\"sid\":\"il0ZOYhV67tK6MQ2AAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":60000}2:40"))
+				w.Write([]byte("86:0{\"sid\":\"O624xTOe2HpOooI0RZdy\",\"upgrades\":[],\"pingInterval\":30000,\"pingTimeout\":60000}2:40"))
+				//w.Write([]byte(events + "40"))
+				fmt.Println("EventsIn writed")
+				//case <-disconnectNotify:
+				// Client connection closed before any events occurred and before
+				// the timeout was exceeded.  Tell manager to forget about this
+				// client.
+				//clientTimeouts <- subscription.clientCategoryPair
 			}
-		case <-disconnectNotify:
-			// Client connection closed before any events occurred and before
-			// the timeout was exceeded.  Tell manager to forget about this
-			// client.
-			//clientTimeouts <- subscription.clientCategoryPair
-		}
+
 	}
 }
