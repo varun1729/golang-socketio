@@ -10,9 +10,13 @@ import (
 	"fmt"
 	_ "io"
 	"log"
-	_ "strconv"
+	"strconv"
 
+	"strings"
 )
+
+var counter int =0;
+var pc int =0;
 
 type PollingTransportParams struct {
 	Headers http.Header
@@ -21,17 +25,23 @@ type PollingTransportParams struct {
 type PollingConnection struct {
 	transport           *PollingTransport
 	eventsIn            chan string
+	eventsOut            chan string
+	//IncomeMessageChan chan string
 	SubscriptionHandler func(w http.ResponseWriter, r *http.Request)
 }
 
 func (plc *PollingConnection) GetMessage() (message string, err error) {
-	msg := <-plc.transport.IncomeMessageChan
+	msg := <-plc.eventsIn
 	return msg, nil
+}
+
+func (plc *PollingConnection) PostMessage(message string)  {
+	plc.eventsIn <- message
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
 	fmt.Println("plc WriteMessage before", message)
-	plc.eventsIn <- message
+	plc.eventsOut <- message
 	fmt.Println("plc WriteMessage ", message)
 	return nil
 }
@@ -54,9 +64,11 @@ type PollingTransport struct {
 
 	Headers http.Header
 
-	IncomeMessageChan chan string
+	sids     map[string]*PollingConnection
 
-	PollingConnection *PollingConnection
+	//IncomeMessageChan chan string
+
+	//PollingConnection *PollingConnection
 }
 
 func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
@@ -65,27 +77,52 @@ func (plt *PollingTransport) Connect(url string) (conn Connection, err error) {
 
 func (plt *PollingTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
-	eventChan := make(chan string)
-	SubscriptionHandler := getLongPollSubscriptionHandler(eventChan, 20, true)
+	eventChan := make(chan string, 100)
+	eventOutChan := make(chan string, 100)
+	SubscriptionHandler := getLongPollSubscriptionHandler(eventOutChan, 20, true)
 
-	plc := &PollingConnection{transport: plt, eventsIn: eventChan, SubscriptionHandler: SubscriptionHandler}
-	//go plc.SubscriptionHandler(w, r)
-	plt.PollingConnection = plc
+	plc := &PollingConnection{transport: plt, eventsIn: eventChan, eventsOut: eventOutChan, SubscriptionHandler: SubscriptionHandler}
+	//plc.SubscriptionHandler(w, r)
+	//plt.PollingConnection = plc
+
 	return plc, nil
+}
+
+func (plt *PollingTransport) SetSid(sid string, conn Connection) {
+	plt.sids[sid] = conn.(*PollingConnection)
 }
 
 /**
 Websocket connection do not require any additional processing
 */
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
-	//switch r.Method {
-	//case "GET":
-	//	plt.get(w, r)
-	//case "POST":
-	//	plt.post(w, r)
-	//}
+	sessionId := r.URL.Query().Get("sid")
+	conn, ok := plt.sids[sessionId]
+	switch r.Method {
+	case "GET":
+		//plt.get(w, r)
+		if ok {
+			conn.SubscriptionHandler(w, r)
+		}
+	case "POST":
+		//plt.post(w, r)
+		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyString := string(bodyBytes)
+		fmt.Println("post ", bodyString)
+		index := strings.Index(bodyString, ":")
+		body := bodyString[index+1:len(bodyString)]
+		fmt.Println("post body", body)
+		//if pc == 0 {
+		//	w.Write([]byte("2:40"))
+		//} else {
 
-	plt.PollingConnection.SubscriptionHandler(w, r)
+		conn.eventsIn<-body
+		w.Write([]byte("ok"))
+	}
+
+	//plt.PollingConnection.SubscriptionHandler(w, r)
+
+
 }
 
 func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
@@ -122,9 +159,9 @@ func (plt *PollingTransport) get(w http.ResponseWriter, r *http.Request) {
 
 func (plt *PollingTransport) post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
-	bodyString := string(bodyBytes)
-	plt.IncomeMessageChan <- bodyString
+	//bodyBytes, _ := ioutil.ReadAll(r.Body)
+	//bodyString := string(bodyBytes)
+	//plt.IncomeMessageChan <- bodyString
 	fmt.Println("post")
 }
 
@@ -138,6 +175,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 		ReceiveTimeout: WsDefaultReceiveTimeout,
 		SendTimeout:    WsDefaultSendTimeout,
 		BufferSize:     WsDefaultBufferSize,
+		sids:     make(map[string]*PollingConnection),
 
 		Headers: nil,
 	}
@@ -154,6 +192,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int, loggingEnabled bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		//timeout, err := strconv.Atoi(r.URL.Query().Get("timeout"))
+
 		timeout := 10
 
 		fmt.Println("ollSubscriptionHandler, timeout ")
@@ -167,6 +206,26 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
 		w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
 		w.Header().Set("Expires", "0")                                         // Proxies.
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		//w.Header().Set("Set-Cookie", "io=roenPVdL73Bj_LKMAAAE; Path=/; HttpOnly")
+
+		if r.Method=="POST" {
+			bodyBytes, _ := ioutil.ReadAll(r.Body)
+			bodyString := string(bodyBytes)
+			fmt.Println("post ", bodyString)
+			//if pc == 0 {
+			//	w.Write([]byte("2:40"))
+			//} else {
+			w.Write([]byte("ok"))
+			//}
+			//if bodyString=="14:40/socket.io/," {
+			//	w.Write([]byte("ok"))
+			//	return
+			//}
+			return
+		}
+
 		// if err != nil || timeout > maxTimeoutSeconds || timeout < 1 {
 		// 	if loggingEnabled {
 		// 		log.Printf("Error: Invalid timeout param.  Must be 1-%d. Got: %q.\n",
@@ -240,16 +299,36 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 				// 	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
 				// }
 
-				//io.WriteString(w, events+"40")
-				//w.Write([]byte("97:0{\"sid\":\"il0ZOYhV67tK6MQ2AAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":60000}2:40"))
-				w.Write([]byte("86:0{\"sid\":\"O624xTOe2HpOooI0RZdy\",\"upgrades\":[],\"pingInterval\":30000,\"pingTimeout\":60000}2:40"))
-				//w.Write([]byte(events + "40"))
-				fmt.Println("EventsIn writed")
+				events = strconv.Itoa(len(events)) + ":" + events
+				//time.Sleep(2 * time.Second)
+				w.Write([]byte(events))
+
+
+//if counter==0 {
+//	//io.WriteString(w, events+"40")
+//	w.Write([]byte("97:0{\"sid\":\"il0ZOYhV67tK6MQ2AAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":60000}"))
+//	//w.Write([]byte("86:0{\"sid\":\"aaYsu0y-42QFC1AoAAAB\",\"upgrades\":[],\"pingInterval\":30000,\"pingTimeout\":60000}"))
+//counter++
+//	} else if counter==1 {
+//	w.Write([]byte("2:40"))//("33:44/socket.io/,\"Invalid namespace\""))
+//	counter++
+//} else {
+//	time.Sleep(26 * time.Second)
+//	w.Write([]byte("1:3"))
+//}
+
+
+
+				//w.Write([]byte("0{\"sid\":\"O624xTOe2HpOooI0RZdy\",\"upgrades\":[],\"pingInterval\":30000,\"pingTimeout\":60000}40"))
+
+				//w.Write([]byte(events))
+				fmt.Println("EventsIn writed ", events)
 				//case <-disconnectNotify:
 				// Client connection closed before any events occurred and before
 				// the timeout was exceeded.  Tell manager to forget about this
 				// client.
 				//clientTimeouts <- subscription.clientCategoryPair
+				return
 			}
 
 	}

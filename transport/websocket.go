@@ -63,6 +63,14 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 	return text, nil
 }
 
+func (wsc *WebsocketConnection) PostMessage(message string)  {
+
+}
+
+func (wsc *WebsocketConnection) SetSid(sid string, conn Connection) {
+
+}
+
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)

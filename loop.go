@@ -123,7 +123,9 @@ func inLoop(c *Channel, m *methods) error {
 		if err != nil {
 			return CloseChannel(c, m, err)
 		}
+		fmt.Println("inLoop pkg ", pkg)
 		msg, err := protocol.Decode(pkg)
+		fmt.Println("inLoop ", msg)
 		if err != nil {
 			CloseChannel(c, m, protocol.ErrorWrongPacket)
 			return err

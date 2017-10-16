@@ -5,8 +5,17 @@
 </head>
 <body>
 	<script>
-  var socket = io('http://localhost:3811/socket.io/', {transports: ['polling']});
-  //socket.on('connect', function(){});
+  var socket = io('http://localhost:3811', {transports: ['polling']});
+  socket.on('connect', function() {
+      console.log('socket connected');
+
+      // //send something
+      // socket.emit('send', {name: "my name", message: "hello"}, function (result) {
+      //
+      //     console.log('sended successfully');
+      //     console.log(result);
+      // });
+  });
   //socket.on('event', function(data){});
   //socket.on('disconnect', function(){});
 </script>

@@ -14,6 +14,7 @@ import (
 
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
+	_"strconv"
 )
 
 const (
@@ -316,6 +317,8 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	c.server = s
 	c.header = hdr
 
+	s.tr.SetSid(hdr.Sid, conn)
+
 	s.SendOpenSequence(c)
 
 	go inLoop(c, &s.methods)
@@ -328,13 +331,27 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 implements ServeHTTP function from http.Handler
 */
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.tr.HandleConnection(w, r)
-	if err != nil {
-		return
-	}
+	session := r.URL.Query().Get("sid")
+	if session == "" {
+		fmt.Println("session none")
+		conn, err := s.tr.HandleConnection(w, r)
+		if err != nil {
+			return
+		}
 
-	s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-	s.tr.Serve(w, r)
+		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
+		conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
+		//s.tr.Serve(w, r)
+	} else {
+		//fmt.Println("session ", session)
+		//channel, err := s.GetChannel(session)
+		//if err!=nil {
+		//	fmt.Println("error finding channel")
+		//} else {
+		//	//channel.conn.PostMessage("")
+		//}
+		s.tr.Serve(w, r)
+	}
 }
 
 /**
