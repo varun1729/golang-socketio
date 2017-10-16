@@ -193,7 +193,7 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 	return func(w http.ResponseWriter, r *http.Request) {
 		//timeout, err := strconv.Atoi(r.URL.Query().Get("timeout"))
 
-		timeout := 10
+		timeout := 30
 
 		fmt.Println("ollSubscriptionHandler, timeout ")
 
@@ -288,6 +288,7 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 				//	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
 				//}
 				//fmt.Println("EventsIn timeout", timeout)
+				w.Write([]byte("1:3"))
 			case events := <-EventsIn:
 				fmt.Println("EventsIn ", events)
 				// Consume event.  Subscription manager will automatically discard
