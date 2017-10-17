@@ -1,10 +1,12 @@
 package transport
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -41,6 +43,27 @@ func (plc *PollingConnection) PingParams() (time.Duration, time.Duration) {
 	return plc.transport.PingInterval, plc.transport.PingTimeout
 }
 
+// sessionMap describes sessions needed for identifying polling connections with socket.io connections
+type sessionMap struct {
+	sync.Mutex
+	sessions map[string]*PollingConnection
+}
+
+// Set sets sid to polling connection tr
+func (s *sessionMap) Set(sid string, tr *PollingConnection) {
+	s.Lock()
+	defer s.Unlock()
+	s.sessions[sid] = tr
+}
+
+// Get returns polling connection if if exists, and bool existence flag
+func (s *sessionMap) Get(sid string) (*PollingConnection, bool) {
+	s.Lock()
+	defer s.Unlock()
+	tr, exists := s.sessions[sid]
+	return tr, exists
+}
+
 type PollingTransport struct {
 	PingInterval   time.Duration
 	PingTimeout    time.Duration
@@ -51,7 +74,7 @@ type PollingTransport struct {
 
 	Headers http.Header
 
-	sids map[string]*PollingConnection
+	sessions sessionMap
 }
 
 func (plt *PollingTransport) Connect(url string) (Connection, error) {
@@ -60,8 +83,8 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 
 func (plt *PollingTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (Connection, error) {
-	eventChan := make(chan string, 100)
-	eventOutChan := make(chan string, 100)
+	eventChan := make(chan string)
+	eventOutChan := make(chan string)
 	SubscriptionHandler := getLongPollSubscriptionHandler(eventOutChan)
 
 	plc := &PollingConnection{
@@ -75,22 +98,27 @@ func (plt *PollingTransport) HandleConnection(
 }
 
 func (plt *PollingTransport) SetSid(sid string, conn Connection) {
-	plt.sids[sid] = conn.(*PollingConnection)
+	plt.sessions.Set(sid, conn.(*PollingConnection))
 }
 
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.URL.Query().Get("sid")
-	conn, ok := plt.sids[sessionId]
+	conn, exists := plt.sessions.Get(sessionId)
 	switch r.Method {
 	case "GET":
-		if ok {
-			conn.SubscriptionHandler(w, r)
+		if !exists {
+			return
 		}
+		conn.SubscriptionHandler(w, r)
 	case "POST":
-		bodyBytes, _ := ioutil.ReadAll(r.Body)
+		bodyBytes, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			fmt.Println("error in PollingTransport.Serve():", err)
+			return
+		}
 		bodyString := string(bodyBytes)
 		index := strings.Index(bodyString, ":")
-		body := bodyString[index+1 : len(bodyString)]
+		body := bodyString[index+1:]
 		conn.eventsIn <- body
 		w.Write([]byte("ok"))
 	}
@@ -106,8 +134,11 @@ func GetDefaultPollingTransport() *PollingTransport {
 		ReceiveTimeout: WsDefaultReceiveTimeout,
 		SendTimeout:    WsDefaultSendTimeout,
 		BufferSize:     WsDefaultBufferSize,
-		sids:           make(map[string]*PollingConnection),
-		Headers:        nil,
+		sessions: sessionMap{
+			Mutex:    sync.Mutex{},
+			sessions: map[string]*PollingConnection{},
+		},
+		Headers: nil,
 	}
 }
 
@@ -123,8 +154,8 @@ func getLongPollSubscriptionHandler(EventsIn chan string) func(w http.ResponseWr
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
 		w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
 		w.Header().Set("Expires", "0")                                         // Proxies.
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		//w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		//w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		select {
 		case <-time.After(time.Duration(timeout) * time.Second):
@@ -132,7 +163,6 @@ func getLongPollSubscriptionHandler(EventsIn chan string) func(w http.ResponseWr
 		case events := <-EventsIn:
 			events = strconv.Itoa(len(events)) + ":" + events
 			w.Write([]byte(events))
-			return
 		}
 	}
 }
