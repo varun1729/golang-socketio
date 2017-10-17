@@ -92,9 +92,7 @@ func (plt *PollingTransport) SetSid(sid string, conn Connection) {
 	plt.sids[sid] = conn.(*PollingConnection)
 }
 
-/**
-Websocket connection do not require any additional processing
-*/
+
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.URL.Query().Get("sid")
 	conn, ok := plt.sids[sessionId]
@@ -210,21 +208,21 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		//w.Header().Set("Set-Cookie", "io=roenPVdL73Bj_LKMAAAE; Path=/; HttpOnly")
 
-		if r.Method=="POST" {
-			bodyBytes, _ := ioutil.ReadAll(r.Body)
-			bodyString := string(bodyBytes)
-			fmt.Println("post ", bodyString)
-			//if pc == 0 {
-			//	w.Write([]byte("2:40"))
-			//} else {
-			w.Write([]byte("ok"))
-			//}
-			//if bodyString=="14:40/socket.io/," {
-			//	w.Write([]byte("ok"))
-			//	return
-			//}
-			return
-		}
+		//if r.Method=="POST" {
+		//	bodyBytes, _ := ioutil.ReadAll(r.Body)
+		//	bodyString := string(bodyBytes)
+		//	fmt.Println("post ", bodyString)
+		//	//if pc == 0 {
+		//	//	w.Write([]byte("2:40"))
+		//	//} else {
+		//	w.Write([]byte("ok"))
+		//	//}
+		//	//if bodyString=="14:40/socket.io/," {
+		//	//	w.Write([]byte("ok"))
+		//	//	return
+		//	//}
+		//	return
+		//}
 
 		// if err != nil || timeout > maxTimeoutSeconds || timeout < 1 {
 		// 	if loggingEnabled {
@@ -287,7 +285,7 @@ func getLongPollSubscriptionHandler(EventsIn chan string, maxTimeoutSeconds int,
 				//} else {
 				//	io.WriteString(w, "{\"error\": \"json marshaller failed\"}")
 				//}
-				//fmt.Println("EventsIn timeout", timeout)
+				fmt.Println("EventsIn timeout", timeout)
 				w.Write([]byte("1:3"))
 			case events := <-EventsIn:
 				fmt.Println("EventsIn ", events)

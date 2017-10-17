@@ -36,13 +36,20 @@ func main() {
 	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
 		log.Println("Connected")
 
-		//c.Emit("/message", MessageInner{10, "main", "using emit"})
+		c.Emit("/message", MessageInner{10, "main", "using emit"})
 
 		//c.Join("test")
 		//c.BroadcastTo("test", "/message", MessageInner{10, "main", "using broadcast"})
 	})
 	server.On(gosocketio.OnDisconnection, func(c *gosocketio.Channel) {
 		log.Println("Disconnected")
+	})
+
+	server.On("send", func(c *gosocketio.Channel, channel ChannelInner) string {
+
+		log.Println("came send ")
+		return "send received"
+
 	})
 
 	server.On("/join", func(c *gosocketio.Channel, channel ChannelInner) string {
