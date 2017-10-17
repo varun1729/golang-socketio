@@ -332,18 +332,21 @@ implements ServeHTTP function from http.Handler
 */
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session := r.URL.Query().Get("sid")
-	if session == "" {
-		conn, err := s.tr.HandleConnection(w, r)
-		if err != nil {
-			return
-		}
-		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-		switch conn.(type) {
-		case *transport.PollingConnection:
-			conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
-		}
-	} else {
+
+	// session is empty in first polling request, or first and single websocket request
+	if session != "" {
 		s.tr.Serve(w, r)
+		return
+	}
+
+	conn, err := s.tr.HandleConnection(w, r)
+	if err != nil {
+		return
+	}
+	s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
+	switch conn.(type) {
+	case *transport.PollingConnection:
+		conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
 	}
 }
 
