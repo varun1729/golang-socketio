@@ -1,18 +1,11 @@
 package transport
 
 import (
-	_ "errors"
 	"io/ioutil"
 	"net/http"
-	"time"
-
-	_ "encoding/json"
-	"fmt"
-	_ "io"
-	"log"
 	"strconv"
-
 	"strings"
+	"time"
 )
 
 type PollingTransportParams struct {

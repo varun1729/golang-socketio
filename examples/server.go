@@ -5,17 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
-
 
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
-
 )
-
-type ChannelInner struct {
-	Channel string `json:"channel"`
-}
 
 type MessageInner struct {
 	Id      int    `json:"id"`
@@ -28,7 +21,7 @@ var assetsDir http.FileSystem
 
 func main() {
 	currentRoot, _ := os.Getwd()
-	assetsDir = http.Dir(currentRoot + "\\examples" + "\\assets")
+	assetsDir = http.Dir(currentRoot + "/assets")
 	fmt.Println(assetsDir)
 
 	server := gosocketio.NewServer(transport.GetDefaultPollingTransport())
@@ -45,17 +38,14 @@ func main() {
 		log.Println("Disconnected")
 	})
 
-	server.On("send", func(c *gosocketio.Channel, channel ChannelInner) string {
-
+	server.On("send", func(c *gosocketio.Channel, param string) string {
 		log.Println("came send ")
 		return "send received"
-
 	})
 
-	server.On("/join", func(c *gosocketio.Channel, channel ChannelInner) string {
-		time.Sleep(2 * time.Second)
-		log.Println("Client joined to ", channel.Channel)
-		return "joined to " + channel.Channel
+	server.On("another", func(c *gosocketio.Channel, param string) string {
+		log.Println("came another", param)
+		return "another param:" + param
 	})
 
 	serveMux := http.NewServeMux()

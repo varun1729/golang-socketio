@@ -9,13 +9,20 @@
   socket.on('connect', function() {
       console.log('socket connected');
 
-      // //send something
+      //send something
       socket.emit('send', {name: "my name", message: "hello"}, function (result) {
-
+          console.log('sended successfully');
+          console.log(result);
+      });
+      socket.emit('another', "something", function (result) {
           console.log('sended successfully');
           console.log(result);
       });
   });
+  /*socket.on('ack', function(data){
+  	console.log(data);
+  	return "success";
+  });*/
   //socket.on('event', function(data){});
   //socket.on('disconnect', function(){});
 </script>

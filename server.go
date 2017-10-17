@@ -14,7 +14,7 @@ import (
 
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
-	_"strconv"
+	_ "strconv"
 )
 
 const (
@@ -333,23 +333,16 @@ implements ServeHTTP function from http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session := r.URL.Query().Get("sid")
 	if session == "" {
-		fmt.Println("session none")
 		conn, err := s.tr.HandleConnection(w, r)
 		if err != nil {
 			return
 		}
-
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-		conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
-		//s.tr.Serve(w, r)
+		switch conn.(type) {
+		case *transport.PollingConnection:
+			conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
+		}
 	} else {
-		//fmt.Println("session ", session)
-		//channel, err := s.GetChannel(session)
-		//if err!=nil {
-		//	fmt.Println("error finding channel")
-		//} else {
-		//	//channel.conn.PostMessage("")
-		//}
 		s.tr.Serve(w, r)
 	}
 }

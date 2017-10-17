@@ -16,8 +16,6 @@ type Connection interface {
 
 	PostMessage(message string)
 
-
-
 	/**
 	Send given message, block until sent
 	*/
