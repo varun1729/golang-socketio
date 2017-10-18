@@ -346,7 +346,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
 	switch conn.(type) {
 	case *transport.PollingConnection:
-		conn.(*transport.PollingConnection).SubscriptionHandler(w, r)
+		conn.(*transport.PollingConnection).PollingWriter(w, r)
 	}
 }
 

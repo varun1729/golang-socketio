@@ -18,7 +18,7 @@ type PollingConnection struct {
 	transport           *PollingTransport
 	eventsIn            chan string
 	eventsOut           chan string
-	SubscriptionHandler func(w http.ResponseWriter, r *http.Request)
+	//PollingWriter func(w http.ResponseWriter, r *http.Request)
 }
 
 func (plc *PollingConnection) GetMessage() (string, error) {
@@ -81,12 +81,12 @@ func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Req
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
 
-	subscriptionHandler := getLongPollSubscriptionHandler(eventOutChan)
+	//PollingWriter := getLongPollPollingWriter(eventOutChan)
 	plc := &PollingConnection{
 		transport:           plt,
 		eventsIn:            eventChan,
 		eventsOut:           eventOutChan,
-		SubscriptionHandler: subscriptionHandler,
+		//PollingWriter: PollingWriter,
 	}
 
 	return plc, nil
@@ -104,7 +104,7 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		if !exists {
 			return
 		}
-		conn.SubscriptionHandler(w, r)
+		conn.PollingWriter(w, r)
 	case "POST":
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -137,27 +137,22 @@ func GetDefaultPollingTransport() *PollingTransport {
 	}
 }
 
-// get web handler that has closure around sub chanel and clientTimeout channnel
-func getLongPollSubscriptionHandler(eventsIn chan string) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		timeout := 30
+func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
+	timeout := 30
 
-		// We are going to return json no matter what:
-		w.Header().Set("Content-Type", "application/json")
+	// We are going to return json no matter what:
+	w.Header().Set("Content-Type", "application/json")
 
-		// Don't cache response:
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
-		w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
-		w.Header().Set("Expires", "0")                                         // Proxies.
-		//w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		//w.Header().Set("Access-Control-Allow-Credentials", "true")
+	// Don't cache response:
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
+	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
+	w.Header().Set("Expires", "0")                                         // Proxies.
 
-		select {
-		case <-time.After(time.Duration(timeout) * time.Second):
-			w.Write([]byte("1:3"))
-		case events := <-eventsIn:
-			events = strconv.Itoa(len(events)) + ":" + events
-			w.Write([]byte(events))
-		}
+	select {
+	case <-time.After(time.Duration(timeout) * time.Second):
+		w.Write([]byte("1:3"))
+	case events := <-plc.eventsOut:
+		events = strconv.Itoa(len(events)) + ":" + events
+		w.Write([]byte(events))
 	}
 }

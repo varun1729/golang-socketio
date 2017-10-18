@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	_"path/filepath"
 
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
@@ -22,7 +22,8 @@ var assetsDir http.FileSystem
 
 func main() {
 	currentRoot, _ := os.Getwd()
-	assetsDir = http.Dir(filepath.Join(currentRoot, "assets"))
+	//assetsDir = http.Dir(filepath.Join(currentRoot, "assets"))
+	assetsDir = http.Dir(currentRoot + "\\examples" + "\\assets")
 	fmt.Println(assetsDir)
 
 	server := gosocketio.NewServer(transport.GetDefaultPollingTransport())
