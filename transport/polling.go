@@ -116,6 +116,7 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		bodyString := string(bodyBytes)
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
+		setHeaders(w)
 		w.Write([]byte("ok"))
 		conn.eventsIn <- body
 	}
@@ -140,14 +141,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 
 
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
-	// We are going to return json no matter what:
-	w.Header().Set("Content-Type", "application/json")
-
-	// Don't cache response:
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
-	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
-	w.Header().Set("Expires", "0")                                         // Proxies.
-
+	setHeaders(w)
 	select {
 	case <-time.After(plc.sendTimeOut * time.Second):
 		w.Write([]byte("1:3"))
@@ -155,4 +149,13 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		events = strconv.Itoa(len(events)) + ":" + events
 		w.Write([]byte(events))
 	}
+}
+
+func setHeaders (w http.ResponseWriter) {
+	// We are going to return json no matter what:
+	w.Header().Set("Content-Type", "application/json")
+	// Don't cache response:
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
+	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
+	w.Header().Set("Expires", "0")                                         // Proxies.
 }
