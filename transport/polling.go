@@ -137,9 +137,9 @@ func GetDefaultPollingTransport() *PollingTransport {
 	}
 }
 
-func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
-	timeout := 30
 
+func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
+		timeout := 30
 	// We are going to return json no matter what:
 	w.Header().Set("Content-Type", "application/json")
 
