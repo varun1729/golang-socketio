@@ -22,10 +22,10 @@ type PollingTransportParams struct {
 }
 
 type PollingConnection struct {
-	transport           *PollingTransport
-	eventsIn            chan string
-	eventsOut           chan string
-	sendTimeOut 		time.Duration
+	transport   *PollingTransport
+	eventsIn    chan string
+	eventsOut   chan string
+	sendTimeOut time.Duration
 }
 
 func (plc *PollingConnection) GetMessage() (string, error) {
@@ -73,7 +73,7 @@ type PollingTransport struct {
 	ReceiveTimeout time.Duration
 	SendTimeout    time.Duration
 
-	Headers http.Header
+	Headers  http.Header
 	sessions sessionMap
 }
 
@@ -85,10 +85,10 @@ func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Req
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
 	plc := &PollingConnection{
-		transport:           plt,
-		eventsIn:            eventChan,
-		eventsOut:           eventOutChan,
-		sendTimeOut: 		 plt.SendTimeout,
+		transport:   plt,
+		eventsIn:    eventChan,
+		eventsOut:   eventOutChan,
+		sendTimeOut: plt.SendTimeout,
 	}
 
 	return plc, nil
@@ -139,8 +139,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 	}
 }
 
-
-func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
+func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	select {
 	case <-time.After(plc.sendTimeOut * time.Second):
@@ -151,7 +150,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func setHeaders (w http.ResponseWriter) {
+func setHeaders(w http.ResponseWriter) {
 	// We are going to return json no matter what:
 	w.Header().Set("Content-Type", "application/json")
 	// Don't cache response:

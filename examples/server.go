@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	_"path/filepath"
+	_ "path/filepath"
 
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
