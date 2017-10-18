@@ -26,10 +26,6 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 	return msg, nil
 }
 
-func (plc *PollingConnection) PostMessage(message string) {
-	plc.eventsIn <- message
-}
-
 func (plc *PollingConnection) WriteMessage(message string) error {
 	plc.eventsOut <- message
 	return nil
@@ -81,8 +77,7 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 	return nil, nil
 }
 
-func (plt *PollingTransport) HandleConnection(
-	w http.ResponseWriter, r *http.Request) (Connection, error) {
+func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
 	SubscriptionHandler := getLongPollSubscriptionHandler(eventOutChan)

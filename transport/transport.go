@@ -14,8 +14,6 @@ type Connection interface {
 	*/
 	GetMessage() (message string, err error)
 
-	PostMessage(message string)
-
 	/**
 	Send given message, block until sent
 	*/
