@@ -102,12 +102,12 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.URL.Query().Get("sid")
 	conn, exists := plt.sessions.Get(sessionId)
 	switch r.Method {
-	case "GET":
+	case http.MethodGet:
 		if !exists {
 			return
 		}
 		conn.PollingWriter(w, r)
-	case "POST":
+	case http.MethodPost:
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			fmt.Println("error in PollingTransport.Serve():", err)

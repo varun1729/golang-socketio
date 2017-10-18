@@ -113,7 +113,7 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 func (wst *WebsocketTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, upgradeFailed+ErrorMethodNotAllowed.Error(), 503)
 		return nil, ErrorMethodNotAllowed
 	}

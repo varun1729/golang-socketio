@@ -62,7 +62,7 @@ func main() {
 }
 
 func AssetsFileHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" && r.Method != "HEAD" {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return
 	}
 	var file string = r.URL.Path
