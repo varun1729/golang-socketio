@@ -10,6 +10,13 @@ import (
 	"time"
 )
 
+const (
+	PlDefaultPingInterval   = 30 * time.Second
+	PlDefaultPingTimeout    = 60 * time.Second
+	PlDefaultReceiveTimeout = 60 * time.Second
+	PlDefaultSendTimeout    = 60 * time.Second
+)
+
 type PollingTransportParams struct {
 	Headers http.Header
 }
@@ -18,7 +25,7 @@ type PollingConnection struct {
 	transport           *PollingTransport
 	eventsIn            chan string
 	eventsOut           chan string
-	//PollingWriter func(w http.ResponseWriter, r *http.Request)
+	sendTimeOut 		time.Duration
 }
 
 func (plc *PollingConnection) GetMessage() (string, error) {
@@ -66,10 +73,7 @@ type PollingTransport struct {
 	ReceiveTimeout time.Duration
 	SendTimeout    time.Duration
 
-	BufferSize int
-
 	Headers http.Header
-
 	sessions sessionMap
 }
 
@@ -80,13 +84,11 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
-
-	//PollingWriter := getLongPollPollingWriter(eventOutChan)
 	plc := &PollingConnection{
 		transport:           plt,
 		eventsIn:            eventChan,
 		eventsOut:           eventOutChan,
-		//PollingWriter: PollingWriter,
+		sendTimeOut: 		 plt.SendTimeout,
 	}
 
 	return plc, nil
@@ -114,21 +116,20 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		bodyString := string(bodyBytes)
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
-		conn.eventsIn <- body
 		w.Write([]byte("ok"))
+		conn.eventsIn <- body
 	}
 }
 
 /**
-Returns websocket connection with default params
+Returns polling transport with default params
 */
 func GetDefaultPollingTransport() *PollingTransport {
 	return &PollingTransport{
-		PingInterval:   WsDefaultPingInterval,
-		PingTimeout:    WsDefaultPingTimeout,
-		ReceiveTimeout: WsDefaultReceiveTimeout,
-		SendTimeout:    WsDefaultSendTimeout,
-		BufferSize:     WsDefaultBufferSize,
+		PingInterval:   PlDefaultPingInterval,
+		PingTimeout:    PlDefaultPingTimeout,
+		ReceiveTimeout: PlDefaultReceiveTimeout,
+		SendTimeout:    PlDefaultSendTimeout,
 		sessions: sessionMap{
 			Mutex:    sync.Mutex{},
 			sessions: map[string]*PollingConnection{},
@@ -139,7 +140,6 @@ func GetDefaultPollingTransport() *PollingTransport {
 
 
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request){
-		timeout := 30
 	// We are going to return json no matter what:
 	w.Header().Set("Content-Type", "application/json")
 
@@ -149,7 +149,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Expires", "0")                                         // Proxies.
 
 	select {
-	case <-time.After(time.Duration(timeout) * time.Second):
+	case <-time.After(plc.sendTimeOut * time.Second):
 		w.Write([]byte("1:3"))
 	case events := <-plc.eventsOut:
 		events = strconv.Itoa(len(events)) + ":" + events
