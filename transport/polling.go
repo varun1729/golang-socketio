@@ -26,12 +26,10 @@ type PollingConnection struct {
 	transport *PollingTransport
 	eventsIn  chan string
 	eventsOut chan string
+	errors    chan string
 }
 
 func (plc *PollingConnection) GetMessage() (string, error) {
-	//msg := <-plc.eventsIn
-	//return msg, nil
-
 	select {
 	case <-time.After(plc.transport.ReceiveTimeout):
 		fmt.Println("Receive time out")
@@ -43,6 +41,16 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 
 func (plc *PollingConnection) WriteMessage(message string) error {
 	plc.eventsOut <- message
+	select {
+	case <-time.After(plc.transport.SendTimeout):
+		fmt.Println("write after time out")
+		return errors.New("Write time out")
+	case errString := <-plc.errors:
+		if errString != "0" {
+			fmt.Println("write err ", errString)
+			return errors.New(errString)
+		}
+	}
 	return nil
 }
 
@@ -96,6 +104,7 @@ func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Req
 		transport: plt,
 		eventsIn:  eventChan,
 		eventsOut: eventOutChan,
+		errors:    make(chan string),
 	}
 
 	return plc, nil
@@ -153,15 +162,20 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		_, err := w.Write([]byte("1:3"))
 		if err != nil {
 			fmt.Println("write err timeout")
+			plc.errors <- err.Error()
 			return
 		}
+		plc.errors <- "0"
 	case events := <-plc.eventsOut:
 		events = strconv.Itoa(len(events)) + ":" + events
-		_, err := w.Write([]byte(events))
+		n, err := w.Write([]byte(events))
+		fmt.Println("message writed size ", n)
 		if err != nil {
+			plc.errors <- err.Error()
 			fmt.Println("write err events")
 			return
 		}
+		plc.errors <- "0"
 	}
 }
 
