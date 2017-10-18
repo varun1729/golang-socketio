@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -22,15 +23,22 @@ type PollingTransportParams struct {
 }
 
 type PollingConnection struct {
-	transport   *PollingTransport
-	eventsIn    chan string
-	eventsOut   chan string
-	sendTimeOut time.Duration
+	transport *PollingTransport
+	eventsIn  chan string
+	eventsOut chan string
 }
 
 func (plc *PollingConnection) GetMessage() (string, error) {
-	msg := <-plc.eventsIn
-	return msg, nil
+	//msg := <-plc.eventsIn
+	//return msg, nil
+
+	select {
+	case <-time.After(plc.transport.ReceiveTimeout * time.Second):
+		fmt.Println("Receive time out")
+		return "", errors.New("Receive time out")
+	case msg := <-plc.eventsIn:
+		return msg, nil
+	}
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
@@ -85,10 +93,9 @@ func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Req
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
 	plc := &PollingConnection{
-		transport:   plt,
-		eventsIn:    eventChan,
-		eventsOut:   eventOutChan,
-		sendTimeOut: plt.SendTimeout,
+		transport: plt,
+		eventsIn:  eventChan,
+		eventsOut: eventOutChan,
 	}
 
 	return plc, nil
@@ -142,11 +149,19 @@ func GetDefaultPollingTransport() *PollingTransport {
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	select {
-	case <-time.After(plc.sendTimeOut * time.Second):
-		w.Write([]byte("1:3"))
+	case <-time.After(plc.transport.PingTimeout * time.Second):
+		_, err := w.Write([]byte("1:3"))
+		if err != nil {
+			fmt.Println("write err timeout")
+			return
+		}
 	case events := <-plc.eventsOut:
 		events = strconv.Itoa(len(events)) + ":" + events
-		w.Write([]byte(events))
+		_, err := w.Write([]byte(events))
+		if err != nil {
+			fmt.Println("write err events")
+			return
+		}
 	}
 }
 
