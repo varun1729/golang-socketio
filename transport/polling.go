@@ -33,7 +33,7 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 	//return msg, nil
 
 	select {
-	case <-time.After(plc.transport.ReceiveTimeout * time.Second):
+	case <-time.After(plc.transport.ReceiveTimeout):
 		fmt.Println("Receive time out")
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
@@ -149,7 +149,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	select {
-	case <-time.After(plc.transport.PingTimeout * time.Second):
+	case <-time.After(plc.transport.PingTimeout):
 		_, err := w.Write([]byte("1:3"))
 		if err != nil {
 			fmt.Println("write err timeout")
