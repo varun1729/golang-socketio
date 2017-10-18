@@ -80,13 +80,13 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
-	SubscriptionHandler := getLongPollSubscriptionHandler(eventOutChan)
 
+	subscriptionHandler := getLongPollSubscriptionHandler(eventOutChan)
 	plc := &PollingConnection{
 		transport:           plt,
 		eventsIn:            eventChan,
 		eventsOut:           eventOutChan,
-		SubscriptionHandler: SubscriptionHandler,
+		SubscriptionHandler: subscriptionHandler,
 	}
 
 	return plc, nil
@@ -138,7 +138,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 }
 
 // get web handler that has closure around sub chanel and clientTimeout channnel
-func getLongPollSubscriptionHandler(EventsIn chan string) func(w http.ResponseWriter, r *http.Request) {
+func getLongPollSubscriptionHandler(eventsIn chan string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		timeout := 30
 
@@ -155,7 +155,7 @@ func getLongPollSubscriptionHandler(EventsIn chan string) func(w http.ResponseWr
 		select {
 		case <-time.After(time.Duration(timeout) * time.Second):
 			w.Write([]byte("1:3"))
-		case events := <-EventsIn:
+		case events := <-eventsIn:
 			events = strconv.Itoa(len(events)) + ":" + events
 			w.Write([]byte(events))
 		}
