@@ -48,4 +48,6 @@ type Transport interface {
 	Serve HTTP request after making connection and events setup
 	*/
 	Serve(w http.ResponseWriter, r *http.Request)
+
+	SetSid(sid string, conn Connection)
 }

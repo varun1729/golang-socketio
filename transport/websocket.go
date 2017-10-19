@@ -63,6 +63,8 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 	return text, nil
 }
 
+func (wsc *WebsocketTransport) SetSid(sid string, conn Connection) {}
+
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
@@ -111,7 +113,7 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 func (wst *WebsocketTransport) HandleConnection(
 	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
 
-	if r.Method != "GET" {
+	if r.Method != http.MethodGet {
 		http.Error(w, upgradeFailed+ErrorMethodNotAllowed.Error(), 503)
 		return nil, ErrorMethodNotAllowed
 	}

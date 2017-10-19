@@ -12,8 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mtfelian/golang-socketio/protocol"
-	"github.com/mtfelian/golang-socketio/transport"
+	"github.com/geneva-lake/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/transport"
+	_ "strconv"
 )
 
 const (
@@ -281,7 +282,7 @@ func (s *Server) SendOpenSequence(c *Channel) {
 	if err != nil {
 		panic(err)
 	}
-
+	//fmt.Println("SendOpenSequence, header ", string(jsonHdr))
 	c.out <- protocol.MustEncode(
 		&protocol.Message{
 			Type: protocol.MessageTypeOpen,
@@ -315,6 +316,8 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	c.server = s
 	c.header = hdr
 
+	s.tr.SetSid(hdr.Sid, conn)
+
 	s.SendOpenSequence(c)
 
 	go inLoop(c, &s.methods)
@@ -327,13 +330,23 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 implements ServeHTTP function from http.Handler
 */
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	session := r.URL.Query().Get("sid")
+
+	// session is empty in first polling request, or first and single websocket request
+	if session != "" {
+		s.tr.Serve(w, r)
+		return
+	}
+
 	conn, err := s.tr.HandleConnection(w, r)
 	if err != nil {
 		return
 	}
-
 	s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-	s.tr.Serve(w, r)
+	switch conn.(type) {
+	case *transport.PollingConnection:
+		conn.(*transport.PollingConnection).PollingWriter(w, r)
+	}
 }
 
 /**

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 const (
@@ -103,7 +103,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		data := f.getArgs()
 		err := json.Unmarshal([]byte(msg.Args), &data)
 		if err != nil {
-			fmt.Println("msg.Args: %v, data: %v, err: %v", msg.Args, data, err)
+			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
 			return
 		}
 
