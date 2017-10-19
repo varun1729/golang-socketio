@@ -1,14 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	_ "path/filepath"
+	"path/filepath"
 
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
+	"github.com/mtfelian/utils"
 )
 
 type MessageInner struct {
@@ -22,9 +24,13 @@ var assetsDir http.FileSystem
 
 func main() {
 	currentRoot, _ := os.Getwd()
-	//assetsDir = http.Dir(filepath.Join(currentRoot, "assets"))
-	assetsDir = http.Dir(currentRoot + "\\examples" + "\\assets")
-	fmt.Println(assetsDir)
+	d := filepath.Join(currentRoot, "assets")
+	if !utils.FileExists(d) {
+		d = filepath.Join(currentRoot, "examples", "assets")
+	}
+	assetsDir = http.Dir(d)
+
+	fmt.Println("assetsDir:", assetsDir)
 
 	server := gosocketio.NewServer(transport.GetDefaultPollingTransport())
 
@@ -40,8 +46,13 @@ func main() {
 		log.Println("Disconnected")
 	})
 
-	server.On("send", func(c *gosocketio.Channel, param string) string {
+	server.On("send", func(c *gosocketio.Channel, param interface{}) string {
 		log.Println("came send ")
+		j, err := json.Marshal(param)
+		if err != nil {
+			log.Println("marhsalling err:", err)
+		}
+		fmt.Println("json:", string(j))
 		return "send received"
 	})
 

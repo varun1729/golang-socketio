@@ -32,7 +32,6 @@ type PollingConnection struct {
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
 	case <-time.After(plc.transport.ReceiveTimeout):
-		fmt.Println("Receive time out")
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
 		return msg, nil
@@ -43,11 +42,9 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 	plc.eventsOut <- message
 	select {
 	case <-time.After(plc.transport.SendTimeout):
-		fmt.Println("write after time out")
 		return errors.New("Write time out")
 	case errString := <-plc.errors:
 		if errString != "0" {
-			fmt.Println("write err ", errString)
 			return errors.New(errString)
 		}
 	}
@@ -161,18 +158,15 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 	case <-time.After(plc.transport.PingTimeout):
 		_, err := w.Write([]byte("1:3"))
 		if err != nil {
-			fmt.Println("write err timeout")
 			plc.errors <- err.Error()
 			return
 		}
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
 		events = strconv.Itoa(len(events)) + ":" + events
-		n, err := w.Write([]byte(events))
-		fmt.Println("message writed size ", n)
+		_, err := w.Write([]byte(events))
 		if err != nil {
 			plc.errors <- err.Error()
-			fmt.Println("write err events")
 			return
 		}
 		plc.errors <- "0"
@@ -180,7 +174,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 }
 
 func setHeaders(w http.ResponseWriter) {
-	// We are going to return json no matter what:
+	// We are going to return JSON no matter what:
 	w.Header().Set("Content-Type", "application/json")
 	// Don't cache response:
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
