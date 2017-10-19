@@ -33,8 +33,8 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	c, err := gosocketio.Dial(
-		gosocketio.GetUrl("localhost", 3811, false),
-		transport.GetDefaultWebsocketTransport())
+		gosocketio.GetUrlPolling("localhost", 3811, false),
+		transport.GetDefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,15 +60,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	time.Sleep(1 * time.Second)
-
-	go sendJoin(c)
-	go sendJoin(c)
-	go sendJoin(c)
-	go sendJoin(c)
-	go sendJoin(c)
-
-	time.Sleep(60 * time.Second)
+	time.Sleep(600 * time.Second)
 	c.Close()
 
 	log.Println(" [x] Complete")
