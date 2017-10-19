@@ -10,14 +10,15 @@
       console.log('socket connected');
 
       //send something
-      // socket.emit('send', {name: "my name", message: "hello"}, function (result) {
-      //     console.log('sended successfully');
-      //     console.log(result);
-      // });
-      // socket.emit('another', "something", function (result) {
-      //     console.log('sended successfully');
-      //     console.log(result);
-      // });
+      /*socket.emit('send', {name: "my name", message: "hello"}, function (result) {
+          console.log('sended successfully');
+          console.log(result);
+      });*/
+      socket.emit('send', {name: "my name", message: "hello"});
+      socket.emit('another', "something", function (result) {
+          console.log('sended successfully');
+          console.log(result);
+      });
   });
   socket.open();
   /*socket.on('ack', function(data){
