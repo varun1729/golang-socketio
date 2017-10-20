@@ -26,6 +26,8 @@ type PollingClientConnection struct {
 	sid       string
 }
 
+func (plc *PollingClientConnection) Close() {}
+
 func (plc *PollingClientConnection) GetMessage() (string, error) {
 	fmt.Println("get url ", plc.url)
 	resp, err := plc.client.Get(plc.url)
@@ -75,10 +77,6 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 	return nil
 }
 
-func (plc *PollingClientConnection) Close() {
-
-}
-
 func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
 	return plc.transport.PingInterval, plc.transport.PingTimeout
 }
@@ -93,6 +91,12 @@ type PollingClientTransport struct {
 	sessions sessionMap
 }
 
+func (plt *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
+	return nil, nil
+}
+func (plt *PollingClientTransport) Serve(w http.ResponseWriter, r *http.Request) {}
+func (plt *PollingClientTransport) SetSid(sid string, conn Connection)           {}
+
 func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	plc := &PollingClientConnection{
 		transport: plt,
@@ -101,17 +105,6 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	}
 
 	return plc, nil
-}
-
-func (plt *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
-	return nil, nil
-}
-
-func (plt *PollingClientTransport) Serve(w http.ResponseWriter, r *http.Request) {
-}
-
-func (plt *PollingClientTransport) SetSid(sid string, conn Connection) {
-
 }
 
 /**
