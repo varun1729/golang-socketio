@@ -46,8 +46,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+
+
 	err = c.On(gosocketio.OnDisconnection, func(h *gosocketio.Channel) {
-		log.Fatal("Disconnected")
+		//log.Fatal("Disconnected")
+		log.Println("Disconnected")
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -60,8 +63,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	time.Sleep(600 * time.Second)
+	time.Sleep(20 * time.Second)
 	c.Close()
+	//c.Emit("41", "")
+	log.Println("client closed")
+	time.Sleep(30 * time.Second)
 
 	log.Println(" [x] Complete")
 }

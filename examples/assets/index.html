@@ -5,28 +5,52 @@
 </head>
 <body>
 	<script>
-  var socket = io('http://localhost:3811', {transports: ['polling'], autoConnect: false});
+  var socket = io('http://localhost:3811', {transports: ['polling']});
   socket.on('connect', function() {
       console.log('socket connected');
 
       //send something
-      /*socket.emit('send', {name: "my name", message: "hello"}, function (result) {
-          console.log('sended successfully');
-          console.log(result);
-      });*/
-      socket.emit('send', {name: "my name", message: "hello"});
-      socket.emit('another', "something", function (result) {
-          console.log('sended successfully');
-          console.log(result);
-      });
+      // socket.emit('send', {name: "my name", message: "hello"}, function (result) {
+      //     console.log('sended successfully');
+      //     console.log(result);
+      // });
+      //socket.emit('send', {name: "my name", message: "hello"});
+      // socket.emit('another', "something", function (result) {
+      //     console.log('sended successfully');
+      //     console.log(result);
+      // });
   });
-  socket.open();
+  //socket.open();
   /*socket.on('ack', function(data){
   	console.log(data);
   	return "success";
   });*/
   //socket.on('event', function(data){});
-  //socket.on('disconnect', function(){});
+  socket.on('disconnect', function(){
+      console.log('sended disconnect');
+  });
+
+  function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function demo() {
+      console.log('Taking a break...');
+      await sleep(20000);
+       console.log('disconnect');
+       socket.disconnect();
+	  //socket.emit('disconnect');
+      // socket.emit('send', {name: "my name", message: "hello"}, function (result) {
+       //    console.log('sended successfully');
+       //    console.log(result);
+      // });
+
+  }
+
+  demo();
+
+  //socket.emit('disconnect', {});
+  //socket.disconnect();
 </script>
 </body>
 </html>

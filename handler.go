@@ -90,10 +90,14 @@ On emit - look for processing function
 func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
+		fmt.Println("finding method ", msg.Method)
 		f, ok := m.findMethod(msg.Method)
 		if !ok {
+			fmt.Println("not found method")
 			return
 		}
+
+		fmt.Println("found method ",f)
 
 		if !f.ArgsPresent {
 			f.callFunc(c, &struct{}{})
@@ -101,6 +105,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		}
 
 		data := f.getArgs()
+		fmt.Println("f.getArgs ", data)
 		err := json.Unmarshal([]byte(msg.Args), &data)
 		if err != nil {
 			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
@@ -123,7 +128,6 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 			if err != nil {
 				return
 			}
-
 			result = f.callFunc(c, data)
 		} else {
 			result = f.callFunc(c, &struct{}{})

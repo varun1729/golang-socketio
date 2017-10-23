@@ -4,11 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	_"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 const (
@@ -16,6 +19,7 @@ const (
 	PlDefaultPingTimeout    = 60 * time.Second
 	PlDefaultReceiveTimeout = 60 * time.Second
 	PlDefaultSendTimeout    = 60 * time.Second
+	StopMessage = "stop"
 )
 
 type PollingTransportParams struct {
@@ -34,11 +38,18 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 	case <-time.After(plc.transport.ReceiveTimeout):
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
+		fmt.Println("GetMessage: ", msg)
+		if msg == protocol.CloseMessage {
+			//plc.eventsOut <- protocol.CloseMessage
+			fmt.Println("send message 1 to eventsOut")
+			return "", errors.New("Close connection")
+		}
 		return msg, nil
 	}
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
+	fmt.Println("WriteMessage ", message)
 	plc.eventsOut <- message
 	select {
 	case <-time.After(plc.transport.SendTimeout):
@@ -52,7 +63,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-
+	plc.WriteMessage("1")
 }
 
 func (plc *PollingConnection) PingParams() (time.Duration, time.Duration) {
@@ -95,8 +106,8 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 }
 
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
-	eventChan := make(chan string)
-	eventOutChan := make(chan string)
+	eventChan := make(chan string, 100)
+	eventOutChan := make(chan string, 100)
 	plc := &PollingConnection{
 		transport: plt,
 		eventsIn:  eventChan,
@@ -119,9 +130,11 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		if !exists {
 			return
 		}
+		fmt.Println("get method")
 		conn.PollingWriter(w, r)
 	case http.MethodPost:
 		bodyBytes, err := ioutil.ReadAll(r.Body)
+		r.Body.Close()
 		if err != nil {
 			fmt.Println("error in PollingTransport.Serve():", err)
 			return
@@ -130,8 +143,11 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
 		setHeaders(w)
+		fmt.Println("post mseg: ", body)
 		w.Write([]byte("ok"))
+		fmt.Println("post response writed ")
 		conn.eventsIn <- body
+		fmt.Println("body to eventsIn ")
 	}
 }
 
@@ -153,23 +169,63 @@ func GetDefaultPollingTransport() *PollingTransport {
 }
 
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
-	setHeaders(w)
+	//setHeaders(w)
 	select {
-	case <-time.After(plc.transport.PingTimeout):
-		_, err := w.Write([]byte("1:3"))
-		if err != nil {
-			plc.errors <- err.Error()
-			return
-		}
+	case <-time.After(plc.transport.SendTimeout):
+		fmt.Println("timeout message to write ")
+		//_, err := w.Write([]byte("1:6"))
+		//if err != nil {
+		//	fmt.Println("timeout message to write err", err)
+		//	plc.errors <- err.Error()
+		//	return
+		//}
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
-		events = strconv.Itoa(len(events)) + ":" + events
-		_, err := w.Write([]byte(events))
-		if err != nil {
-			plc.errors <- err.Error()
-			return
+		fmt.Println("get message to write ", events)
+		if events == "1" {
+			fmt.Println("writing message 1")
 		}
-		plc.errors <- "0"
+		if events == "send received" {
+			fmt.Println("send received write")
+		}
+		events = strconv.Itoa(len(events)) + ":" + events
+		if events == "1:1" {
+			fmt.Println("writing message 1:1")
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+				return
+			}
+			conn, bufrw, err := hj.Hijack()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// Don't forget to close the connection:
+			 defer conn.Close()
+			bufrw.WriteString("1:1")
+			bufrw.Flush()
+			//s, err := bufrw.ReadString('\n')
+			////if err != nil {
+			////	log.Printf("error reading string: %v", err)
+			////	return
+			////}
+			//fmt.Fprintf(bufrw, "You said: %q\nBye.\n", s)
+			//bufrw.Flush()
+			fmt.Println("hijack return")
+			plc.errors <- "0"
+		} else {
+			_, err := w.Write([]byte(events))
+			if events == "1" {
+				fmt.Println("writed message 1")
+			}
+			if err != nil {
+				fmt.Println("err write message ", err)
+				plc.errors <- err.Error()
+				return
+			}
+			plc.errors <- "0"
+		}
 	}
 }
 

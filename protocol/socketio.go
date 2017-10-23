@@ -8,11 +8,12 @@ import (
 )
 
 const (
-	open          = "0"
-	msg           = "4"
-	emptyMessage  = "40"
-	commonMessage = "42"
-	ackMessage    = "43"
+	open               = "0"
+	msg                = "4"
+	emptyMessage       = "40"
+	commonMessage      = "42"
+	ackMessage         = "43"
+	closeClientMessage = "41"
 
 	CloseMessage = "1"
 	PingMessage  = "2"
@@ -104,6 +105,8 @@ func getMessageType(data string) (int, error) {
 		switch data[0:2] {
 		case emptyMessage:
 			return MessageTypeEmpty, nil
+		case closeClientMessage:
+			return MessageTypeClose, nil
 		case commonMessage:
 			return MessageTypeAckRequest, nil
 		case ackMessage:

@@ -53,7 +53,8 @@ func main() {
 			log.Println("marhsalling err:", err)
 		}
 		fmt.Println("json:", string(j))
-		return "send received"
+		//c.Emit("send", "send received")
+		return "send received"//"OK"
 	})
 
 	server.On("another", func(c *gosocketio.Channel, param string) string {

@@ -76,7 +76,7 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingClientConnection) Close() {
-
+	plc.WriteMessage("1")
 }
 
 func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
