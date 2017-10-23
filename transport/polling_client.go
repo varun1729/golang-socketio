@@ -27,7 +27,6 @@ type PollingClientConnection struct {
 }
 
 func (plc *PollingClientConnection) GetMessage() (string, error) {
-	fmt.Println("get url ", plc.url)
 	resp, err := plc.client.Get(plc.url)
 	if err != nil {
 		fmt.Println("error in get client: ", err)
@@ -39,7 +38,6 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 		return "", err
 	}
 	bodyString := string(bodyBytes)
-	fmt.Println("bodystring ", bodyString)
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
 	if string(body[0]) == "0" {

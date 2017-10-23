@@ -9,7 +9,6 @@ import (
 
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
-	"fmt"
 )
 
 const (
@@ -83,7 +82,6 @@ func (c *Channel) IsAlive() bool {
 
 // Close закрывает соединение для клиента (канала)
 func (c *Channel) Close() error {
-	fmt.Println("Close channel close")
 	return CloseChannel(c, &c.server.methods, nil)
 }
 
@@ -93,7 +91,6 @@ Close channel
 func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
-	fmt.Println("Close channel begin")
 	if !c.alive {
 		//already closed
 		return nil
@@ -101,24 +98,17 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 
 	c.conn.Close()
 	c.alive = false
-	fmt.Println("before clean outloop")
+
 	//clean outloop
 	for len(c.out) > 0 {
 		<-c.out
 	}
-	fmt.Println("Close channel")
+
 	c.out <- protocol.CloseMessage
-	fmt.Println("Close to out channel")
-
 	m.callLoopEvent(c, OnDisconnection)
-
-	fmt.Println("OnDisconnection callLoopEvent")
-
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
-
-	fmt.Println("CloseChannel return")
 
 	return nil
 }
@@ -128,14 +118,11 @@ func inLoop(c *Channel, m *methods) error {
 	for {
 		pkg, err := c.conn.GetMessage()
 		if err != nil {
-			fmt.Println("CloseChannel 1 ", err)
 			return CloseChannel(c, m, err)
 		}
-		fmt.Println("inLoop pkg 2", pkg)
 		msg, err := protocol.Decode(pkg)
-		//fmt.Println("inLoop ", msg)
+
 		if err != nil {
-			fmt.Println("CloseChannel 2 ", err)
 			CloseChannel(c, m, protocol.ErrorWrongPacket)
 			return err
 		}
@@ -143,7 +130,6 @@ func inLoop(c *Channel, m *methods) error {
 		switch msg.Type {
 		case protocol.MessageTypeOpen:
 			if err := json.Unmarshal([]byte(msg.Source[1:]), &c.header); err != nil {
-				fmt.Println("CloseChannel 3")
 				CloseChannel(c, m, ErrorWrongHeader)
 			}
 			m.callLoopEvent(c, OnConnection)
@@ -174,30 +160,23 @@ func outLoop(c *Channel, m *methods) error {
 	for {
 		outBufferLen := len(c.out)
 		if outBufferLen >= queueBufferSize-1 {
-			fmt.Println("CloseChannel 5")
 			return CloseChannel(c, m, ErrorSocketOverflood)
 		} else if outBufferLen > int(queueBufferSize/2) {
-			fmt.Println("outBufferLen > int(queueBufferSize/2)")
 			overfloodedLock.Lock()
 			overflooded[c] = struct{}{}
 			overfloodedLock.Unlock()
 		} else {
-			fmt.Println("CloseChannel 5 else")
 			overfloodedLock.Lock()
 			delete(overflooded, c)
 			overfloodedLock.Unlock()
 		}
 
 		msg := <-c.out
-		fmt.Println("outLoop ", msg)
 		if msg == protocol.CloseMessage {
-			fmt.Println("outLoop CloseMessage", msg)
 			return nil
 		}
 		err := c.conn.WriteMessage(msg)
-		fmt.Println("outLoop msg writed", msg)
 		if err != nil {
-			fmt.Println("CloseChannel 6")
 			return CloseChannel(c, m, err)
 		}
 	}
