@@ -46,6 +46,11 @@ func main() {
 		log.Println("Disconnected")
 	})
 
+	server.On("/join", func(c *gosocketio.Channel, param interface{}) string {
+		fmt.Println(">>>", param)
+		return "/join received"
+	})
+
 	server.On("send", func(c *gosocketio.Channel, param interface{}) string {
 		log.Println("came send ")
 		j, err := json.Marshal(param)
@@ -54,7 +59,7 @@ func main() {
 		}
 		fmt.Println("json:", string(j))
 		//c.Emit("send", "send received")
-		return "send received"//"OK"
+		return "send received" //"OK"
 	})
 
 	server.On("another", func(c *gosocketio.Channel, param string) string {
