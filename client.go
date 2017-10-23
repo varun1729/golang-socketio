@@ -9,9 +9,11 @@ import (
 const (
 	webSocketProtocol       = "ws://"
 	webSocketSecureProtocol = "wss://"
-	socketioUrl             = "/socket.io/?EIO=3&transport=websocket"
+	socketioWebsocketUrl    = "/socket.io/?EIO=3&transport=websocket"
+
 	pollingProtocol       = "http://"
-	pollingioUrl             = "/socket.io/?EIO=3&transport=polling"
+	pollingSecureProtocol = "https://"
+	socketioPollingUrl    = "/socket.io/?EIO=3&transport=polling"
 )
 
 /**
@@ -22,21 +24,23 @@ type Client struct {
 	Channel
 }
 
-/**
-Get ws/wss url by host and port
-*/
+// GetUrl returns an url for socket.io connection for wesocket transport
 func GetUrl(host string, port int, secure bool) string {
-	var prefix string
+	prefix := webSocketProtocol
 	if secure {
 		prefix = webSocketSecureProtocol
-	} else {
-		prefix = webSocketProtocol
 	}
-	return prefix + host + ":" + strconv.Itoa(port) + socketioUrl
+	return prefix + host + ":" + strconv.Itoa(port) + socketioWebsocketUrl
 }
 
+// GetUrlPolling returns an url for socket.io connection for polling transport
 func GetUrlPolling(host string, port int, secure bool) string {
-	return pollingProtocol + host + ":" + strconv.Itoa(port) + pollingioUrl
+	prefix := pollingProtocol
+	if secure {
+		prefix = pollingSecureProtocol
+	}
+
+	return prefix + host + ":" + strconv.Itoa(port) + socketioPollingUrl
 }
 
 /**
@@ -48,24 +52,6 @@ ws://myserver.com/socket.io/?EIO=3&transport=websocket
 You can use GetUrlByHost for generating correct url
 */
 func Dial(url string, tr transport.Transport) (*Client, error) {
-	c := &Client{}
-	c.initChannel()
-	c.initMethods()
-
-	var err error
-	c.conn, err = tr.Connect(url)
-	if err != nil {
-		return nil, err
-	}
-
-	go inLoop(&c.Channel, &c.methods)
-	go outLoop(&c.Channel, &c.methods)
-	go pinger(&c.Channel)
-
-	return c, nil
-}
-
-func DialPolling(url string, tr transport.Transport) (*Client, error) {
 	c := &Client{}
 	c.initChannel()
 	c.initMethods()
