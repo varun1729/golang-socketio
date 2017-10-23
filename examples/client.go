@@ -46,7 +46,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	time.Sleep(5 * time.Second)
+
 	sendJoin(c)
+	//c.Emit("send", "send sended")
 
 	err = c.On(gosocketio.OnDisconnection, func(h *gosocketio.Channel) {
 		//log.Fatal("Disconnected")

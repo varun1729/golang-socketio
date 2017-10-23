@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"strconv"
 )
 
 type OpenSequence struct {
@@ -38,6 +39,7 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 		return "", err
 	}
 	bodyString := string(bodyBytes)
+	fmt.Println("bodyString: ", bodyString)
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
 	if string(body[0]) == "0" {
@@ -55,7 +57,9 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 }
 
 func (plc *PollingClientConnection) WriteMessage(message string) error {
-	var jsonStr = []byte(message)
+	msgToWrite := strconv.Itoa(len(message)) + ":" + message
+	fmt.Println("write msg: ", msgToWrite)
+	var jsonStr = []byte(msgToWrite)
 	resp, err := plc.client.Post(plc.url, "application/json", bytes.NewBuffer(jsonStr))
 	if err != nil {
 		fmt.Println("error in post client: ", err)

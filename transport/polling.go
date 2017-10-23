@@ -147,6 +147,7 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		bodyString := string(bodyBytes)
+		fmt.Println("post mseg before split: ", bodyString)
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
 		setHeaders(w)
@@ -182,7 +183,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		fmt.Println("timeout message to write ")
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
-		fmt.Println("get message to write ", events)
+		fmt.Println("post message to write ", events)
 		events = strconv.Itoa(len(events)) + ":" + events
 		if events == "1:1" {
 			fmt.Println("writing message 1:1")
@@ -204,9 +205,9 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 			plc.errors <- "0"
 		} else {
 			_, err := w.Write([]byte(events))
-			if events == "1" {
-				fmt.Println("writed message 1")
-			}
+
+				fmt.Println("writed message ", events)
+
 			if err != nil {
 				fmt.Println("err write message ", err)
 				plc.errors <- err.Error()

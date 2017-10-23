@@ -62,6 +62,8 @@ func main() {
 		return "send received" //"OK"
 	})
 
+
+
 	server.On("another", func(c *gosocketio.Channel, param string) string {
 		log.Println("came another", param)
 		return "another param:" + param

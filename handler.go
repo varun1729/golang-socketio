@@ -115,6 +115,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		f.callFunc(c, data)
 
 	case protocol.MessageTypeAckRequest:
+		fmt.Println("ack request")
 		f, ok := m.findMethod(msg.Method)
 		if !ok || !f.Out {
 			return
@@ -140,6 +141,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		send(ack, c, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
+		fmt.Println("ack response")
 		waiter, err := c.ack.getWaiter(msg.AckId)
 		if err == nil {
 			waiter <- msg.Args
