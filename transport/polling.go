@@ -208,7 +208,9 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 			}
 
 			defer conn.Close()
-			bufrw.WriteString("1:1")
+
+			bufrw.WriteString("HTTP/1.1 200 OK\r\nCache-Control: no-cache, private\r\nContent-Length: 3\r\nDate: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
+			bufrw.WriteString("1:6")
 			bufrw.Flush()
 			fmt.Println("hijack return")
 			plc.errors <- "0"

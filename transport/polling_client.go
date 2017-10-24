@@ -27,10 +27,14 @@ type PollingClientConnection struct {
 	sid            string
 	PollingCounter chan string
 	serverAnswered bool
+	reqCounter int
 }
 
 func (plc *PollingClientConnection) SetServerAnswered(value bool) {
-	plc.serverAnswered = value
+	if plc.reqCounter < 2 {
+		plc.serverAnswered = value
+		plc.reqCounter++
+	}
 }
 
 func (plc *PollingClientConnection) GetServerAnswered() bool {
@@ -122,6 +126,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 		url:            url,
 		PollingCounter: make(chan string),
 		serverAnswered: false,
+		reqCounter: 0,
 	}
 
 	return plc, nil

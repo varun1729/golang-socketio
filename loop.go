@@ -144,7 +144,6 @@ func inLoop(c *Channel, m *methods) error {
 			m.callLoopEvent(c, OnConnection)
 		case protocol.MessageTypeEmpty:
 			fmt.Println("protocol.MessageTypeEmpty: ", msg)
-			//m.callLoopEvent(c, OnPollingConnection)
 			c.conn.SetServerAnswered(true)
 		case protocol.MessageTypePing:
 			c.out <- protocol.PongMessage
