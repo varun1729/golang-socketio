@@ -37,6 +37,12 @@ type WebsocketConnection struct {
 	transport *WebsocketTransport
 }
 
+func (wsc *WebsocketConnection) SetServerAnswered(value bool) {}
+
+func (wsc *WebsocketConnection) GetServerAnswered() bool {
+	return false
+}
+
 func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
 	msgType, reader, err := wsc.socket.NextReader()

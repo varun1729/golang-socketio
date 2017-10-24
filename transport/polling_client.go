@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 type OpenSequence struct {
@@ -21,13 +21,27 @@ type OpenSequence struct {
 }
 
 type PollingClientConnection struct {
-	transport *PollingClientTransport
-	client    *http.Client
-	url       string
-	sid       string
+	transport      *PollingClientTransport
+	client         *http.Client
+	url            string
+	sid            string
+	PollingCounter chan string
+	serverAnswered bool
+}
+
+func (plc *PollingClientConnection) SetServerAnswered(value bool) {
+	plc.serverAnswered = value
+}
+
+func (plc *PollingClientConnection) GetServerAnswered() bool {
+	return plc.serverAnswered
 }
 
 func (plc *PollingClientConnection) GetMessage() (string, error) {
+	fmt.Println("Get request sended")
+	if plc.serverAnswered {
+		plc.PollingCounter <- "get sended"
+	}
 	resp, err := plc.client.Get(plc.url)
 	if err != nil {
 		fmt.Println("error in get client: ", err)
@@ -103,9 +117,11 @@ func (plt *PollingClientTransport) SetSid(sid string, conn Connection)          
 
 func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	plc := &PollingClientConnection{
-		transport: plt,
-		client:    &http.Client{},
-		url:       url,
+		transport:      plt,
+		client:         &http.Client{},
+		url:            url,
+		PollingCounter: make(chan string),
+		serverAnswered: false,
 	}
 
 	return plc, nil

@@ -11,6 +11,7 @@ import (
 
 const (
 	OnConnection    = "connection"
+	OnPollingConnection    = "pollingConnection"
 	OnDisconnection = "disconnection"
 	OnError         = "error"
 )
@@ -67,6 +68,7 @@ func (m *methods) findMethod(method string) (*caller, bool) {
 
 func (m *methods) callLoopEvent(c *Channel, event string) {
 	if m.onConnection != nil && event == OnConnection {
+		fmt.Println("OnConnection callloopevent")
 		m.onConnection(c)
 	}
 	if m.onDisconnection != nil && event == OnDisconnection {
@@ -88,6 +90,7 @@ On ack_req - look for processing function and send ack_resp
 On emit - look for processing function
 */
 func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
+	fmt.Println("processIncomingMessage ", msg)
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
 		fmt.Println("finding method ", msg.Method)

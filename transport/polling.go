@@ -32,9 +32,18 @@ type PollingConnection struct {
 	sid       string
 }
 
+func (plc *PollingConnection) SetServerAnswered(value bool) {
+
+}
+
+func (plc *PollingConnection) GetServerAnswered() bool {
+	return false
+}
+
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
 	case <-time.After(plc.transport.ReceiveTimeout):
+		fmt.Println("Receive time out")
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
 		fmt.Println("GetMessage: ", msg)

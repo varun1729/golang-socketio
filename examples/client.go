@@ -7,6 +7,7 @@ import (
 
 	"github.com/geneva-lake/golang-socketio"
 	"github.com/geneva-lake/golang-socketio/transport"
+	_"fmt"
 )
 
 type Channel struct {
@@ -21,7 +22,7 @@ type Message struct {
 
 func sendJoin(c *gosocketio.Client) {
 	log.Println("Acking /join")
-	result, err := c.Ack("/join", Channel{"main"}, time.Second*5)
+	result, err := c.Ack("/join", Channel{"main"}, time.Second*30)
 	if err != nil {
 		log.Fatal(err)
 	} else {
@@ -31,7 +32,7 @@ func sendJoin(c *gosocketio.Client) {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	//fmt.Println(gosocketio.GetUrl("localhost", 3811, false))
 	c, err := gosocketio.Dial(
 		gosocketio.GetUrlPolling("localhost", 3811, false),
 		transport.GetDefaultPollingClientTransport())
@@ -46,9 +47,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	time.Sleep(5 * time.Second)
+	//time.Sleep(5 * time.Second)
 
-	sendJoin(c)
+	//sendJoin(c)
 	//c.Emit("send", "send sended")
 
 	err = c.On(gosocketio.OnDisconnection, func(h *gosocketio.Channel) {
@@ -59,8 +60,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = c.On(gosocketio.OnConnection, func(h *gosocketio.Channel) {
+	err = c.On(gosocketio.OnPollingConnection, func(h *gosocketio.Channel) {
 		log.Println("Connected")
+		//time.Sleep(5 * time.Second)
+		sendJoin(c)
 	})
 	if err != nil {
 		log.Fatal(err)
