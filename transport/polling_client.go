@@ -21,31 +21,14 @@ type OpenSequence struct {
 }
 
 type PollingClientConnection struct {
-	transport      *PollingClientTransport
-	client         *http.Client
-	url            string
-	sid            string
-	PollingCounter chan string
-	serverAnswered bool
-	reqCounter int
-}
-
-func (plc *PollingClientConnection) SetServerAnswered(value bool) {
-	if plc.reqCounter < 2 {
-		plc.serverAnswered = value
-		plc.reqCounter++
-	}
-}
-
-func (plc *PollingClientConnection) GetServerAnswered() bool {
-	return plc.serverAnswered
+	transport *PollingClientTransport
+	client    *http.Client
+	url       string
+	sid       string
 }
 
 func (plc *PollingClientConnection) GetMessage() (string, error) {
 	fmt.Println("Get request sended")
-	if plc.serverAnswered {
-		plc.PollingCounter <- "get sended"
-	}
 	resp, err := plc.client.Get(plc.url)
 	if err != nil {
 		fmt.Println("error in get client: ", err)
@@ -60,17 +43,6 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 	fmt.Println("bodyString: ", bodyString)
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
-	if string(body[0]) == "0" {
-		bodyBytes2 := []byte(body[1:])
-		var openSequence OpenSequence
-		json.Unmarshal(bodyBytes2, &openSequence)
-		if err != nil {
-			log.Println("read err", err)
-			return "", err
-		}
-		plc.url = plc.url + "&sid=" + openSequence.Sid
-		fmt.Println("plc.url ", plc.url)
-	}
 	return body, nil
 }
 
@@ -88,6 +60,7 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 		fmt.Println("error read resp post body: ", err)
 		return err
 	}
+	resp.Body.Close()
 	bodyString := string(bodyBytes)
 	if bodyString != "ok" {
 		return errors.New("message post not ok")
@@ -121,15 +94,61 @@ func (plt *PollingClientTransport) SetSid(sid string, conn Connection)          
 
 func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	plc := &PollingClientConnection{
-		transport:      plt,
-		client:         &http.Client{},
-		url:            url,
-		PollingCounter: make(chan string),
-		serverAnswered: false,
-		reqCounter: 0,
+		transport: plt,
+		client:    &http.Client{},
+		url:       url,
 	}
 
-	return plc, nil
+	resp, err := plc.client.Get(plc.url)
+	if err != nil {
+		fmt.Println("error in get client: ", err)
+		return nil, err
+	}
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("error read resp body: ", err)
+		return nil, err
+	}
+	resp.Body.Close()
+	bodyString := string(bodyBytes)
+	fmt.Println("bodyString: ", bodyString)
+	index := strings.Index(bodyString, ":")
+	body := bodyString[index+1:]
+	if string(body[0]) == "0" {
+		bodyBytes2 := []byte(body[1:])
+		var openSequence OpenSequence
+		json.Unmarshal(bodyBytes2, &openSequence)
+		if err != nil {
+			log.Println("read err", err)
+			return nil, err
+		}
+		plc.url = plc.url + "&sid=" + openSequence.Sid
+		fmt.Println("plc.url ", plc.url)
+	} else {
+		return nil, errors.New("Not opensequence answer")
+	}
+
+	resp, err = plc.client.Get(plc.url)
+	if err != nil {
+		fmt.Println("error in get client: ", err)
+		return nil, err
+	}
+	bodyBytes, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("error read resp body: ", err)
+		return nil, err
+	}
+	resp.Body.Close()
+	bodyString = string(bodyBytes)
+	fmt.Println("bodyString: ", bodyString)
+	index = strings.Index(bodyString, ":")
+	body = bodyString[index+1:]
+
+	if body == "40" {
+		return plc, nil
+	} else {
+		return nil, errors.New("Not open message answer")
+	}
 }
 
 /**

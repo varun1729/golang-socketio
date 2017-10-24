@@ -24,10 +24,6 @@ type Connection interface {
 	*/
 	Close()
 
-	SetServerAnswered(value bool)
-
-	GetServerAnswered() bool
-
 	/**
 	Get ping time interval and ping request timeout
 	*/

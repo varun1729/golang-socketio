@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
-	"fmt"
 )
 
 const (
@@ -117,11 +117,6 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 //incoming messages loop, puts incoming messages to In channel
 func inLoop(c *Channel, m *methods) error {
 	for {
-		if c.conn.GetServerAnswered() {
-			go pollingClientListener(c,m)
-			c.conn.SetServerAnswered(false)
-		}
-
 		pkg, err := c.conn.GetMessage()
 		if err != nil {
 			return CloseChannel(c, m, err)
@@ -142,9 +137,6 @@ func inLoop(c *Channel, m *methods) error {
 				CloseChannel(c, m, ErrorWrongHeader)
 			}
 			m.callLoopEvent(c, OnConnection)
-		case protocol.MessageTypeEmpty:
-			fmt.Println("protocol.MessageTypeEmpty: ", msg)
-			c.conn.SetServerAnswered(true)
 		case protocol.MessageTypePing:
 			c.out <- protocol.PongMessage
 		case protocol.MessageTypePong:
@@ -211,6 +203,6 @@ func pinger(c *Channel) {
 }
 
 func pollingClientListener(c *Channel, m *methods) {
-	time.Sleep(1*time.Second)
-	m.callLoopEvent(c, OnPollingConnection)
+	time.Sleep(1 * time.Second)
+	m.callLoopEvent(c, OnConnection)
 }

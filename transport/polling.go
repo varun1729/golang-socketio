@@ -32,14 +32,6 @@ type PollingConnection struct {
 	sid       string
 }
 
-func (plc *PollingConnection) SetServerAnswered(value bool) {
-
-}
-
-func (plc *PollingConnection) GetServerAnswered() bool {
-	return false
-}
-
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
 	case <-time.After(plc.transport.ReceiveTimeout):
@@ -217,7 +209,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		} else {
 			_, err := w.Write([]byte(events))
 
-				fmt.Println("writed message ", events)
+			fmt.Println("writed message ", events)
 
 			if err != nil {
 				fmt.Println("err write message ", err)

@@ -77,6 +77,7 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 
 	f, ok := m.findMethod(event)
 	if !ok {
+		fmt.Println("not found method")
 		return
 	}
 

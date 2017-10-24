@@ -60,14 +60,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//err = c.On(gosocketio.OnPollingConnection, func(h *gosocketio.Channel) {
-	//	log.Println("Connected")
-	//	//time.Sleep(5 * time.Second)
-	//	sendJoin(c)
-	//})
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	err = c.On(gosocketio.OnConnection, func(h *gosocketio.Channel) {
+		log.Println("Connected")
+		//time.Sleep(5 * time.Second)
+		c.Emit("send", "send sended")
+		sendJoin(c)
+
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	time.Sleep(5 * time.Second)
 	c.Close()

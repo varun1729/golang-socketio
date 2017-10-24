@@ -43,13 +43,13 @@
       console.log('Taking a break...');
       await sleep(10000);
        console.log('disconnect');
-       //socket.disconnect();
+       socket.disconnect();
 	  //socket.emit('disconnect');
-      socket.emit('send', {name: "my name", message: "hello"});
-      socket.emit('send', {name: "my name", message: "hello"}, function (result) {
-          console.log('sended successfully');
-          console.log(result);
-      });
+      // socket.emit('send', {name: "my name", message: "hello"});
+      // socket.emit('send', {name: "my name", message: "hello"}, function (result) {
+       //    console.log('sended successfully');
+       //    console.log(result);
+      // });
       // socket.on("canUpdate", function(amount, ack) {
       //     ack(true)
       // })
