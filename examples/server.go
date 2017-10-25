@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/geneva-lake/golang-socketio"
-	"github.com/geneva-lake/golang-socketio/transport"
+	"github.com/mtfelian/golang-socketio"
+	"github.com/mtfelian/golang-socketio/transport"
 	"github.com/mtfelian/utils"
 )
 

@@ -1,15 +1,15 @@
 package gosocketio
 
 import (
-	"encoding/json"
+  "fmt"
+  "encoding/json"
 	"errors"
 	"net/http"
 	"sync"
 	"time"
-
-	"fmt"
-	"github.com/geneva-lake/golang-socketio/protocol"
-	"github.com/geneva-lake/golang-socketio/transport"
+  
+	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/mtfelian/golang-socketio/transport"
 )
 
 const (
