@@ -1,12 +1,13 @@
 package gosocketio
 
 import (
-	"encoding/json"
+  "fmt"
+  "encoding/json"
 	"errors"
 	"net/http"
 	"sync"
 	"time"
-
+  
 	"github.com/mtfelian/golang-socketio/protocol"
 	"github.com/mtfelian/golang-socketio/transport"
 )
@@ -91,7 +92,6 @@ Close channel
 func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
-
 	if !c.alive {
 		//already closed
 		return nil
@@ -104,10 +104,9 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	for len(c.out) > 0 {
 		<-c.out
 	}
+
 	c.out <- protocol.CloseMessage
-
 	m.callLoopEvent(c, OnDisconnection)
-
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
@@ -122,16 +121,18 @@ func inLoop(c *Channel, m *methods) error {
 		if err != nil {
 			return CloseChannel(c, m, err)
 		}
-		//fmt.Println("inLoop pkg ", pkg)
 		msg, err := protocol.Decode(pkg)
-		//fmt.Println("inLoop ", msg)
+
 		if err != nil {
 			CloseChannel(c, m, protocol.ErrorWrongPacket)
 			return err
 		}
 
+		fmt.Println("inLoop messages: ", msg)
+
 		switch msg.Type {
 		case protocol.MessageTypeOpen:
+			fmt.Println("protocol.MessageTypeOpen: ", msg)
 			if err := json.Unmarshal([]byte(msg.Source[1:]), &c.header); err != nil {
 				CloseChannel(c, m, ErrorWrongHeader)
 			}
@@ -175,7 +176,6 @@ func outLoop(c *Channel, m *methods) error {
 		}
 
 		msg := <-c.out
-		//fmt.Println("outLoop ", msg)
 		if msg == protocol.CloseMessage {
 			return nil
 		}
@@ -200,4 +200,9 @@ func pinger(c *Channel) {
 
 		c.out <- protocol.PingMessage
 	}
+}
+
+func pollingClientListener(c *Channel, m *methods) {
+	time.Sleep(1 * time.Second)
+	m.callLoopEvent(c, OnConnection)
 }

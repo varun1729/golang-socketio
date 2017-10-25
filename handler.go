@@ -11,6 +11,7 @@ import (
 
 const (
 	OnConnection    = "connection"
+	OnPollingConnection    = "pollingConnection"
 	OnDisconnection = "disconnection"
 	OnError         = "error"
 )
@@ -67,6 +68,7 @@ func (m *methods) findMethod(method string) (*caller, bool) {
 
 func (m *methods) callLoopEvent(c *Channel, event string) {
 	if m.onConnection != nil && event == OnConnection {
+		fmt.Println("OnConnection callloopevent")
 		m.onConnection(c)
 	}
 	if m.onDisconnection != nil && event == OnDisconnection {
@@ -75,6 +77,7 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 
 	f, ok := m.findMethod(event)
 	if !ok {
+		fmt.Println("not found method")
 		return
 	}
 
@@ -88,12 +91,17 @@ On ack_req - look for processing function and send ack_resp
 On emit - look for processing function
 */
 func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
+	fmt.Println("processIncomingMessage ", msg)
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
+		fmt.Println("finding method ", msg.Method)
 		f, ok := m.findMethod(msg.Method)
 		if !ok {
+			fmt.Println("not found method")
 			return
 		}
+
+		fmt.Println("found method ",f)
 
 		if !f.ArgsPresent {
 			f.callFunc(c, &struct{}{})
@@ -101,6 +109,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		}
 
 		data := f.getArgs()
+		fmt.Println("f.getArgs ", data)
 		err := json.Unmarshal([]byte(msg.Args), &data)
 		if err != nil {
 			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
@@ -110,6 +119,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		f.callFunc(c, data)
 
 	case protocol.MessageTypeAckRequest:
+		fmt.Println("ack request")
 		f, ok := m.findMethod(msg.Method)
 		if !ok || !f.Out {
 			return
@@ -123,7 +133,6 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 			if err != nil {
 				return
 			}
-
 			result = f.callFunc(c, data)
 		} else {
 			result = f.callFunc(c, &struct{}{})
@@ -136,6 +145,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		send(ack, c, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
+		fmt.Println("ack response")
 		waiter, err := c.ack.getWaiter(msg.AckId)
 		if err == nil {
 			waiter <- msg.Args
