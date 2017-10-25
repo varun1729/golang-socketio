@@ -2,9 +2,10 @@ package gosocketio
 
 import (
 	"strconv"
+  "time"
 
 	"github.com/geneva-lake/golang-socketio/transport"
-	"time"
+	"github.com/mtfelian/golang-socketio/transport"
 )
 
 const (
