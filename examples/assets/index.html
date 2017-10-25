@@ -5,7 +5,7 @@
 </head>
 <body>
 	<script>
-  var socket = io('http://localhost:3811', {transports: ['polling']});
+  var socket = io('http://localhost:3811', {transports: ['polling', 'websocket']});
   socket.on('connect', function() {
       console.log('socket connected');
 
@@ -61,7 +61,7 @@
 
   }
 
-  demo();
+  //demo();
 
   //socket.emit('disconnect', {});
   //socket.disconnect();

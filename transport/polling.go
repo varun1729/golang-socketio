@@ -25,7 +25,7 @@ type PollingTransportParams struct {
 }
 
 type PollingConnection struct {
-	transport *PollingTransport
+	Transport *PollingTransport
 	eventsIn  chan string
 	eventsOut chan string
 	errors    chan string
@@ -34,7 +34,7 @@ type PollingConnection struct {
 
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
-	case <-time.After(plc.transport.ReceiveTimeout):
+	case <-time.After(plc.Transport.ReceiveTimeout):
 		fmt.Println("Receive time out")
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
@@ -51,7 +51,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 	fmt.Println("WriteMessage ", message)
 	plc.eventsOut <- message
 	select {
-	case <-time.After(plc.transport.SendTimeout):
+	case <-time.After(plc.Transport.SendTimeout):
 		return errors.New("Write time out")
 	case errString := <-plc.errors:
 		if errString != "0" {
@@ -62,12 +62,12 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-	plc.WriteMessage("1")
-	plc.transport.sessions.Delete(plc.sid)
+	//plc.WriteMessage("1")
+	//plc.Transport.sessions.Delete(plc.sid)
 }
 
 func (plc *PollingConnection) PingParams() (time.Duration, time.Duration) {
-	return plc.transport.PingInterval, plc.transport.PingTimeout
+	return plc.Transport.PingInterval, plc.Transport.PingTimeout
 }
 
 // sessionMap describes sessions needed for identifying polling connections with socket.io connections
@@ -116,7 +116,7 @@ func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Req
 	eventChan := make(chan string, 100)
 	eventOutChan := make(chan string, 100)
 	plc := &PollingConnection{
-		transport: plt,
+		Transport: plt,
 		eventsIn:  eventChan,
 		eventsOut: eventOutChan,
 		errors:    make(chan string),
@@ -180,7 +180,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	select {
-	case <-time.After(plc.transport.SendTimeout):
+	case <-time.After(plc.Transport.SendTimeout):
 		fmt.Println("timeout message to write ")
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:

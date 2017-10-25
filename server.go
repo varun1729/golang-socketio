@@ -15,6 +15,7 @@ import (
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
 	_ "strconv"
+	"log"
 )
 
 const (
@@ -40,7 +41,9 @@ type Server struct {
 	sids     map[string]*Channel
 	sidsLock sync.RWMutex
 
-	tr transport.Transport
+	//tr transport.Transport
+	websocket *transport.WebsocketTransport
+	polling *transport.PollingTransport
 }
 
 /**
@@ -302,7 +305,7 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	interval, timeout := conn.PingParams()
 	hdr := Header{
 		Sid:          generateNewId(remoteAddr),
-		Upgrades:     []string{},
+		Upgrades:     []string{"websocket"},
 		PingInterval: int(interval / time.Millisecond),
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
@@ -316,7 +319,10 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	c.server = s
 	c.header = hdr
 
-	s.tr.SetSid(hdr.Sid, conn)
+	switch conn.(type) {
+	case *transport.PollingConnection:
+		conn.(*transport.PollingConnection).Transport.SetSid(hdr.Sid, conn)
+	}
 
 	s.SendOpenSequence(c)
 
@@ -327,26 +333,89 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 }
 
 /**
+Setup event loop for given connection
+*/
+func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string,
+	requestHeader http.Header, sid string) {
+fmt.Println("SetupUpgradeEventLoop")
+	c, err := s.GetChannel(sid)
+	if err!= nil {
+		log.Println("can't find channel for session: ", sid)
+		return
+	}
+	c.Close()
+
+	fmt.Println("SetupUpgradeEventLoop close")
+	interval, timeout := conn.PingParams()
+	hdr := Header{
+		Sid:          sid,
+		Upgrades:     []string{"websocket"},
+		PingInterval: int(interval / time.Millisecond),
+		PingTimeout:  int(timeout / time.Millisecond),
+	}
+	c.conn = conn
+	c.ip = remoteAddr
+	c.requestHeader = requestHeader
+	c.initChannel()
+	fmt.Println("SetupUpgradeEventLoop init channel")
+
+	c.server = s
+	c.header = hdr
+
+	s.SendOpenSequence(c)
+
+	go inLoop(c, &s.methods)
+	go outLoop(c, &s.methods)
+
+	fmt.Println("SetupUpgradeEventLoop go loops")
+	s.callLoopEvent(c, OnConnection)
+}
+
+/**
 implements ServeHTTP function from http.Handler
 */
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session := r.URL.Query().Get("sid")
+	tsp := r.URL.Query().Get("transport")
 
-	// session is empty in first polling request, or first and single websocket request
-	if session != "" {
-		s.tr.Serve(w, r)
-		return
+	if tsp == "polling" {
+		// session is empty in first polling request, or first and single websocket request
+		if session != "" {
+			s.polling.Serve(w, r)
+			return
+		}
+
+		conn, err := s.polling.HandleConnection(w, r)
+		if err != nil {
+			return
+		}
+		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
+			conn.(*transport.PollingConnection).PollingWriter(w, r)
+	} else if tsp == "websocket" {
+		if session != "" {
+			//s.websocket.Serve(w, r)
+			//return
+			//_, err := s.GetChannel(session)
+			//if err!= nil {
+			//	log.Println("can't find channel for session: ", session)
+			//	return
+			//}
+
+			fmt.Println("upgrade HandleConnection")
+			conn, err := s.websocket.HandleConnection(w, r)
+			if err != nil {
+				return
+			}
+			s.SetupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
+		}
+
+		conn, err := s.websocket.HandleConnection(w, r)
+		if err != nil {
+			return
+		}
+		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
 	}
 
-	conn, err := s.tr.HandleConnection(w, r)
-	if err != nil {
-		return
-	}
-	s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-	switch conn.(type) {
-	case *transport.PollingConnection:
-		conn.(*transport.PollingConnection).PollingWriter(w, r)
-	}
 }
 
 /**
@@ -372,10 +441,12 @@ func (s *Server) AmountOfRooms() int64 {
 /**
 Create new socket.io server
 */
-func NewServer(tr transport.Transport) *Server {
+func NewServer() *Server {
 	s := Server{}
 	s.initMethods()
-	s.tr = tr
+	//s.tr = tr
+	s.websocket = transport.GetDefaultWebsocketTransport()
+	s.polling = transport.GetDefaultPollingTransport()
 	s.channels = make(map[string]map[*Channel]struct{})
 	s.rooms = make(map[*Channel]map[string]struct{})
 	s.sids = make(map[string]*Channel)
