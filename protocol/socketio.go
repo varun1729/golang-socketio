@@ -14,10 +14,13 @@ const (
 	commonMessage      = "42"
 	ackMessage         = "43"
 	closeClientMessage = "41"
+	upgradeMessage     = "45"
 
 	CloseMessage = "1"
 	PingMessage  = "2"
 	PongMessage  = "3"
+	UpgradeMessage = "5"
+	StubMessage = "stub"
 )
 
 var (
@@ -98,6 +101,8 @@ func getMessageType(data string) (int, error) {
 		return MessageTypePing, nil
 	case PongMessage:
 		return MessageTypePong, nil
+	case UpgradeMessage:
+		return MessageTypeUpgrade, nil
 	case msg:
 		if len(data) == 1 {
 			return 0, ErrorWrongMessageType
@@ -181,6 +186,10 @@ func Decode(data string) (*Message, error) {
 	msg.Type, err = getMessageType(data)
 	if err != nil {
 		return nil, err
+	}
+
+	if msg.Type == MessageTypeUpgrade {
+		return msg, nil
 	}
 
 	if msg.Type == MessageTypeOpen {

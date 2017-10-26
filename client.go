@@ -5,7 +5,6 @@ import (
   "time"
 
 	"github.com/geneva-lake/golang-socketio/transport"
-	"github.com/mtfelian/golang-socketio/transport"
 )
 
 const (

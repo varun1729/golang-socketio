@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mtfelian/golang-socketio/protocol"
-	"github.com/mtfelian/golang-socketio/transport"
-	_ "strconv"
+	"github.com/geneva-lake/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/transport"
 	"log"
+	_ "strconv"
 )
 
 const (
@@ -43,7 +43,7 @@ type Server struct {
 
 	//tr transport.Transport
 	websocket *transport.WebsocketTransport
-	polling *transport.PollingTransport
+	polling   *transport.PollingTransport
 }
 
 /**
@@ -293,7 +293,16 @@ func (s *Server) SendOpenSequence(c *Channel) {
 		},
 	)
 
+	//switch c.conn.(type) {
+	//case *transport.WebsocketConnection:
+	//	c.out <- protocol.MustEncode(&protocol.Message{Type: protocol.MessageTypeEmpty})
+	//}
+
 	c.out <- protocol.MustEncode(&protocol.Message{Type: protocol.MessageTypeEmpty})
+}
+
+func (s *Server) SendUpgradeMessage(c *Channel) {
+	c.out <- "45"
 }
 
 /**
@@ -337,22 +346,24 @@ Setup event loop for given connection
 */
 func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string,
 	requestHeader http.Header, sid string) {
-fmt.Println("SetupUpgradeEventLoop")
-	c, err := s.GetChannel(sid)
-	if err!= nil {
+	fmt.Println("SetupUpgradeEventLoop")
+	cp, err := s.GetChannel(sid)
+	if err != nil {
 		log.Println("can't find channel for session: ", sid)
 		return
 	}
-	c.Close()
+	//cp.Stub()
 
 	fmt.Println("SetupUpgradeEventLoop close")
 	interval, timeout := conn.PingParams()
 	hdr := Header{
 		Sid:          sid,
-		Upgrades:     []string{"websocket"},
+		Upgrades:     []string{},
 		PingInterval: int(interval / time.Millisecond),
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
+
+	c := &Channel{}
 	c.conn = conn
 	c.ip = remoteAddr
 	c.requestHeader = requestHeader
@@ -362,13 +373,18 @@ fmt.Println("SetupUpgradeEventLoop")
 	c.server = s
 	c.header = hdr
 
-	s.SendOpenSequence(c)
+	//s.SendUpgradeMessage(c)
 
 	go inLoop(c, &s.methods)
 	go outLoop(c, &s.methods)
 
 	fmt.Println("SetupUpgradeEventLoop go loops")
-	s.callLoopEvent(c, OnConnection)
+	//s.callLoopEvent(c, OnConnection)
+	onConnectStore(c)
+
+	upgMsg := <-c.upgraded
+	fmt.Println("upgMsg ", upgMsg)
+	cp.Stub()
 }
 
 /**
@@ -390,7 +406,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-			conn.(*transport.PollingConnection).PollingWriter(w, r)
+		conn.(*transport.PollingConnection).PollingWriter(w, r)
 	} else if tsp == "websocket" {
 		if session != "" {
 			//s.websocket.Serve(w, r)
@@ -404,9 +420,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("upgrade HandleConnection")
 			conn, err := s.websocket.HandleConnection(w, r)
 			if err != nil {
+				fmt.Println("upgrade error ", err)
 				return
 			}
 			s.SetupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
+			return
 		}
 
 		conn, err := s.websocket.HandleConnection(w, r)

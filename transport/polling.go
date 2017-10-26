@@ -18,6 +18,8 @@ const (
 	PlDefaultPingTimeout    = 60 * time.Second
 	PlDefaultReceiveTimeout = 60 * time.Second
 	PlDefaultSendTimeout    = 60 * time.Second
+	StopMessaage            = "stop"
+	UpgradedMessaage        = "upgrade"
 )
 
 type PollingTransportParams struct {
@@ -55,6 +57,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 		return errors.New("Write time out")
 	case errString := <-plc.errors:
 		if errString != "0" {
+			fmt.Println("errors write msg ", errString)
 			return errors.New(errString)
 		}
 	}
@@ -62,8 +65,9 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-	//plc.WriteMessage("1")
-	//plc.Transport.sessions.Delete(plc.sid)
+	fmt.Println("PollingConnection close")
+	plc.WriteMessage("6")
+	plc.Transport.sessions.Delete(plc.sid)
 }
 
 func (plc *PollingConnection) PingParams() (time.Duration, time.Duration) {
@@ -78,6 +82,7 @@ type sessionMap struct {
 
 // Set sets sid to polling connection tr
 func (s *sessionMap) Set(sid string, tr *PollingConnection) {
+	fmt.Println("sid: ", sid)
 	s.Lock()
 	defer s.Unlock()
 	s.sessions[sid] = tr
@@ -85,6 +90,8 @@ func (s *sessionMap) Set(sid string, tr *PollingConnection) {
 
 // Delete sid from polling connection tr
 func (s *sessionMap) Delete(sid string) {
+	fmt.Println("sid: ", sid)
+	fmt.Println("s.sessions: ", s.sessions)
 	s.Lock()
 	defer s.Unlock()
 	delete(s.sessions, sid)
@@ -184,10 +191,17 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		fmt.Println("timeout message to write ")
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
+		//first := false
+		//if string(events[0]) == "0" {
+		//	first = true
+		//}
 		fmt.Println("post message to write ", events)
 		events = strconv.Itoa(len(events)) + ":" + events
-		if events == "1:1" {
-			fmt.Println("writing message 1:1")
+		//if first {
+		//	events = events + "2:40"
+		//}
+		if events == "1:6" {
+			fmt.Println("writing message 1:6")
 			hj, ok := w.(http.Hijacker)
 			if !ok {
 				http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
@@ -206,7 +220,13 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 			bufrw.Flush()
 			fmt.Println("hijack return")
 			plc.errors <- "0"
+			plc.eventsIn <- StopMessaage
 		} else {
+			//if events == "2:40" {
+			//	events = "1:6"
+			//	fmt.Println("2:40 to 1:6")
+			//	time.Sleep(3 * time.Second)
+			//}
 			_, err := w.Write([]byte(events))
 
 			fmt.Println("writed message ", events)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"fmt"
 )
 
 const (
@@ -38,25 +39,30 @@ type WebsocketConnection struct {
 }
 
 func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
+	fmt.Println("GetMessage ws begin")
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
 	msgType, reader, err := wsc.socket.NextReader()
 	if err != nil {
+		fmt.Println("ws reading err ", err)
 		return "", err
 	}
 
 	//support only text messages exchange
 	if msgType != websocket.TextMessage {
+		fmt.Println("ws reading err ErrorBinaryMessage")
 		return "", ErrorBinaryMessage
 	}
 
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
+		fmt.Println("ws reading err ErrorBadBuffer")
 		return "", ErrorBadBuffer
 	}
 	text := string(data)
-
+	fmt.Println("GetMessage ws text ", text)
 	//empty messages are not allowed
 	if len(text) == 0 {
+		fmt.Println("ws reading err ErrorPacketWrong")
 		return "", ErrorPacketWrong
 	}
 
@@ -66,6 +72,7 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 func (wsc *WebsocketTransport) SetSid(sid string, conn Connection) {}
 
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
+	fmt.Println("WriteMessage ws ", message)
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
 	if err != nil {
@@ -82,6 +89,7 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 }
 
 func (wsc *WebsocketConnection) Close() {
+	fmt.Println("ws close")
 	wsc.socket.Close()
 }
 

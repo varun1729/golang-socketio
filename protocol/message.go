@@ -33,6 +33,11 @@ const (
 	ack response
 	*/
 	MessageTypeAckResponse = iota
+	/**
+	Upgrade message
+	*/
+	MessageTypeUpgrade = iota
+
 )
 
 type Message struct {
