@@ -105,28 +105,23 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	case *transport.WebsocketConnection:
 		logging.Log().Debug("close channel type: WebsocketConnection")
 	}
-
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 	if !c.alive {
 		//already closed
 		return nil
 	}
-
 	c.conn.Close()
 	c.alive = false
-
 	//clean outloop
 	for len(c.out) > 0 {
 		<-c.out
 	}
-
 	c.out <- protocol.CloseMessage
 	m.callLoopEvent(c, OnDisconnection)
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
-
 	return nil
 }
 
@@ -140,30 +135,22 @@ func StubChannel(c *Channel, m *methods, args ...interface{}) error {
 	case *transport.WebsocketConnection:
 		logging.Log().Debug("Stub channel type: WebsocketConnection")
 	}
-
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 	if !c.alive {
 		//already closed
 		return nil
 	}
-
 	c.conn.Close()
 	c.alive = false
-
 	//clean outloop
 	for len(c.out) > 0 {
 		<-c.out
 	}
-
 	c.out <- protocol.StubMessage
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
-
-	//stbMsg := <-c.stub
-	//logging.Log().Debug("stbMsg ", stbMsg)
-
 	return nil
 }
 
@@ -176,8 +163,8 @@ func inLoop(c *Channel, m *methods) error {
 			return CloseChannel(c, m, err)
 		}
 
-		if pkg == transport.StopMessaage {
-			logging.Log().Debug("inLoop StopMessaage")
+		if pkg == transport.StopMessage {
+			logging.Log().Debug("inLoop StopMessage")
 			return nil
 		}
 
@@ -188,12 +175,7 @@ func inLoop(c *Channel, m *methods) error {
 			CloseChannel(c, m, protocol.ErrorWrongPacket)
 			return err
 		}
-		switch c.conn.(type) {
-		case *transport.PollingConnection:
-			logging.Log().Debug("PollingConnection inLoop messages: ", msg)
-		case *transport.WebsocketConnection:
-			logging.Log().Debug("WebsocketConnection inLoop messages: ", msg)
-		}
+
 		switch msg.Type {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debug("protocol.MessageTypeOpen: ", msg)
@@ -206,12 +188,11 @@ func inLoop(c *Channel, m *methods) error {
 			if msg.Source == "2probe" {
 				logging.Log().Debug("get 2probe")
 				c.out <- "3probe"
-				c.upgraded <- transport.UpgradedMessaage
+				c.upgraded <- transport.UpgradedMessage
 			} else {
 				c.out <- protocol.PongMessage
 			}
 		case protocol.MessageTypeUpgrade:
-			//c.upgraded <- transport.UpgradedMessaage
 		case protocol.MessageTypePong:
 		default:
 			go m.processIncomingMessage(c, msg)
@@ -251,29 +232,11 @@ func outLoop(c *Channel, m *methods) error {
 		}
 
 		msg := <-c.out
-		switch c.conn.(type) {
-		case *transport.PollingConnection:
-			logging.Log().Debug("PollingConnection outLoop messages: ", msg)
-		case *transport.WebsocketConnection:
-			logging.Log().Debug("WebsocketConnection outLoop messages: ", msg)
-		}
+
 		if msg == protocol.CloseMessage {
-			switch c.conn.(type) {
-			case *transport.PollingConnection:
-				logging.Log().Debug("PollingConnection CloseMessage: ", msg)
-			case *transport.WebsocketConnection:
-				logging.Log().Debug("WebsocketConnection CloseMessage: ", msg)
-			}
 			return nil
 		}
 		if msg == protocol.StubMessage {
-			switch c.conn.(type) {
-			case *transport.PollingConnection:
-				logging.Log().Debug("PollingConnection StubMessage: ", msg)
-			case *transport.WebsocketConnection:
-				logging.Log().Debug("WebsocketConnection StubMessage: ", msg)
-			}
-			//c.stub <- protocol.StubMessage
 			return nil
 		}
 		err := c.conn.WriteMessage(msg)

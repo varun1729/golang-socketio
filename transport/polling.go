@@ -18,8 +18,8 @@ const (
 	PlDefaultPingTimeout    = 60 * time.Second
 	PlDefaultReceiveTimeout = 60 * time.Second
 	PlDefaultSendTimeout    = 60 * time.Second
-	StopMessaage            = "stop"
-	UpgradedMessaage        = "upgrade"
+	StopMessage            = "stop"
+	UpgradedMessage        = "upgrade"
 )
 
 type PollingTransportParams struct {
@@ -190,15 +190,8 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		logging.Log().Debug("timeout message to write ")
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
-		//first := false
-		//if string(events[0]) == "0" {
-		//	first = true
-		//}
 		logging.Log().Debug("post message to write ", events)
 		events = strconv.Itoa(len(events)) + ":" + events
-		//if first {
-		//	events = events + "2:40"
-		//}
 		if events == "1:6" {
 			logging.Log().Debug("writing message 1:6")
 			hj, ok := w.(http.Hijacker)
@@ -219,7 +212,7 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 			bufrw.Flush()
 			logging.Log().Debug("hijack return")
 			plc.errors <- "0"
-			plc.eventsIn <- StopMessaage
+			plc.eventsIn <- StopMessage
 		} else {
 			_, err := w.Write([]byte(events))
 
