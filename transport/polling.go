@@ -2,7 +2,6 @@ package transport
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/geneva-lake/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 const (
@@ -37,12 +37,12 @@ type PollingConnection struct {
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
 	case <-time.After(plc.Transport.ReceiveTimeout):
-		fmt.Println("Receive time out")
+		logging.Log().Debug("Receive time out")
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
-		fmt.Println("GetMessage: ", msg)
+		logging.Log().Debug("GetMessage: ", msg)
 		if msg == protocol.CloseMessage {
-			fmt.Println("send message 1 to eventsOut")
+			logging.Log().Debug("send message 1 to eventsOut")
 			return "", errors.New("Close connection")
 		}
 		return msg, nil
@@ -50,14 +50,14 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 }
 
 func (plc *PollingConnection) WriteMessage(message string) error {
-	fmt.Println("WriteMessage ", message)
+	logging.Log().Debug("WriteMessage ", message)
 	plc.eventsOut <- message
 	select {
 	case <-time.After(plc.Transport.SendTimeout):
 		return errors.New("Write time out")
 	case errString := <-plc.errors:
 		if errString != "0" {
-			fmt.Println("errors write msg ", errString)
+			logging.Log().Debug("errors write msg ", errString)
 			return errors.New(errString)
 		}
 	}
@@ -65,7 +65,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-	fmt.Println("PollingConnection close")
+	logging.Log().Info("PollingConnection close ", plc.sid)
 	plc.WriteMessage("6")
 	plc.Transport.sessions.Delete(plc.sid)
 }
@@ -82,7 +82,7 @@ type sessionMap struct {
 
 // Set sets sid to polling connection tr
 func (s *sessionMap) Set(sid string, tr *PollingConnection) {
-	fmt.Println("sid: ", sid)
+	logging.Log().Debug("sid: ", sid)
 	s.Lock()
 	defer s.Unlock()
 	s.sessions[sid] = tr
@@ -90,8 +90,7 @@ func (s *sessionMap) Set(sid string, tr *PollingConnection) {
 
 // Delete sid from polling connection tr
 func (s *sessionMap) Delete(sid string) {
-	fmt.Println("sid: ", sid)
-	fmt.Println("s.sessions: ", s.sessions)
+	logging.Log().Debug("polling delete sid: ", sid)
 	s.Lock()
 	defer s.Unlock()
 	delete(s.sessions, sid)
@@ -145,25 +144,25 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 		if !exists {
 			return
 		}
-		fmt.Println("get method")
+		logging.Log().Debug("get method")
 		conn.PollingWriter(w, r)
 	case http.MethodPost:
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		r.Body.Close()
 		if err != nil {
-			fmt.Println("error in PollingTransport.Serve():", err)
+			logging.Log().Debug("error in PollingTransport.Serve():", err)
 			return
 		}
 		bodyString := string(bodyBytes)
-		fmt.Println("post mseg before split: ", bodyString)
+		logging.Log().Debug("post mseg before split: ", bodyString)
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
 		setHeaders(w)
-		fmt.Println("post mseg: ", body)
+		logging.Log().Debug("post mseg: ", body)
 		w.Write([]byte("ok"))
-		fmt.Println("post response writed ")
+		logging.Log().Debug("post response writed ")
 		conn.eventsIn <- body
-		fmt.Println("body to eventsIn ")
+		logging.Log().Debug("body to eventsIn ")
 	}
 }
 
@@ -188,20 +187,20 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 	setHeaders(w)
 	select {
 	case <-time.After(plc.Transport.SendTimeout):
-		fmt.Println("timeout message to write ")
+		logging.Log().Debug("timeout message to write ")
 		plc.errors <- "0"
 	case events := <-plc.eventsOut:
 		//first := false
 		//if string(events[0]) == "0" {
 		//	first = true
 		//}
-		fmt.Println("post message to write ", events)
+		logging.Log().Debug("post message to write ", events)
 		events = strconv.Itoa(len(events)) + ":" + events
 		//if first {
 		//	events = events + "2:40"
 		//}
 		if events == "1:6" {
-			fmt.Println("writing message 1:6")
+			logging.Log().Debug("writing message 1:6")
 			hj, ok := w.(http.Hijacker)
 			if !ok {
 				http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
@@ -218,21 +217,16 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 			bufrw.WriteString("HTTP/1.1 200 OK\r\nCache-Control: no-cache, private\r\nContent-Length: 3\r\nDate: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
 			bufrw.WriteString("1:6")
 			bufrw.Flush()
-			fmt.Println("hijack return")
+			logging.Log().Debug("hijack return")
 			plc.errors <- "0"
 			plc.eventsIn <- StopMessaage
 		} else {
-			//if events == "2:40" {
-			//	events = "1:6"
-			//	fmt.Println("2:40 to 1:6")
-			//	time.Sleep(3 * time.Second)
-			//}
 			_, err := w.Write([]byte(events))
 
-			fmt.Println("writed message ", events)
+			logging.Log().Debug("writed message ", events)
 
 			if err != nil {
-				fmt.Println("err write message ", err)
+				logging.Log().Debug("err write message ", err)
 				plc.errors <- err.Error()
 				return
 			}

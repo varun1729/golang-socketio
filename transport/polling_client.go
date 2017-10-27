@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 type OpenSequence struct {
@@ -28,19 +28,19 @@ type PollingClientConnection struct {
 }
 
 func (plc *PollingClientConnection) GetMessage() (string, error) {
-	fmt.Println("Get request sended")
+	logging.Log().Debug("Get request sended")
 	resp, err := plc.client.Get(plc.url)
 	if err != nil {
-		fmt.Println("error in get client: ", err)
+		logging.Log().Debug("error in get client: ", err)
 		return "", err
 	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("error read resp body: ", err)
+		logging.Log().Debug("error read resp body: ", err)
 		return "", err
 	}
 	bodyString := string(bodyBytes)
-	fmt.Println("bodyString: ", bodyString)
+	logging.Log().Debug("bodyString: ", bodyString)
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
 	return body, nil
@@ -48,16 +48,16 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 
 func (plc *PollingClientConnection) WriteMessage(message string) error {
 	msgToWrite := strconv.Itoa(len(message)) + ":" + message
-	fmt.Println("write msg: ", msgToWrite)
+	logging.Log().Debug("write msg: ", msgToWrite)
 	var jsonStr = []byte(msgToWrite)
 	resp, err := plc.client.Post(plc.url, "application/json", bytes.NewBuffer(jsonStr))
 	if err != nil {
-		fmt.Println("error in post client: ", err)
+		logging.Log().Debug("error in post client: ", err)
 		return err
 	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("error read resp post body: ", err)
+		logging.Log().Debug("error read resp post body: ", err)
 		return err
 	}
 	resp.Body.Close()
@@ -101,17 +101,17 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 
 	resp, err := plc.client.Get(plc.url)
 	if err != nil {
-		fmt.Println("error in get client: ", err)
+		logging.Log().Debug("error in get client: ", err)
 		return nil, err
 	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("error read resp body: ", err)
+		logging.Log().Debug("error read resp body: ", err)
 		return nil, err
 	}
 	resp.Body.Close()
 	bodyString := string(bodyBytes)
-	fmt.Println("bodyString: ", bodyString)
+	logging.Log().Debug("bodyString: ", bodyString)
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
 	if string(body[0]) == "0" {
@@ -123,24 +123,24 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 			return nil, err
 		}
 		plc.url = plc.url + "&sid=" + openSequence.Sid
-		fmt.Println("plc.url ", plc.url)
+		logging.Log().Debug("plc.url ", plc.url)
 	} else {
 		return nil, errors.New("Not opensequence answer")
 	}
 
 	resp, err = plc.client.Get(plc.url)
 	if err != nil {
-		fmt.Println("error in get client: ", err)
+		logging.Log().Debug("error in get client: ", err)
 		return nil, err
 	}
 	bodyBytes, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("error read resp body: ", err)
+		logging.Log().Debug("error read resp body: ", err)
 		return nil, err
 	}
 	resp.Body.Close()
 	bodyString = string(bodyBytes)
-	fmt.Println("bodyString: ", bodyString)
+	logging.Log().Debug("bodyString: ", bodyString)
 	index = strings.Index(bodyString, ":")
 	body = bodyString[index+1:]
 
