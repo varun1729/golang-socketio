@@ -151,9 +151,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	}
 }
 
-/**
-Returns polling transport with default params
-*/
+// Returns polling transport with default params
 func GetDefaultPollingClientTransport() *PollingClientTransport {
 	return &PollingClientTransport{
 		PingInterval:   PlDefaultPingInterval,

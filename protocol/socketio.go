@@ -121,9 +121,7 @@ func getMessageType(data string) (int, error) {
 	return 0, ErrorWrongMessageType
 }
 
-/**
-Get ack id of current packet, if present
-*/
+// Get ack id of current packet, if present
 func getAck(text string) (ackId int, restText string, err error) {
 	if len(text) < 4 {
 		return 0, "", ErrorWrongPacket
@@ -143,9 +141,7 @@ func getAck(text string) (ackId int, restText string, err error) {
 	return ack, text[pos:], nil
 }
 
-/**
-Get message method of current packet, if present
-*/
+// Get message method of current packet, if present
 func getMethod(text string) (method, restText string, err error) {
 	var start, end, rest, countQuote int
 

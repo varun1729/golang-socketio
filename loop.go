@@ -20,9 +20,7 @@ var (
 	ErrorWrongHeader = errors.New("Wrong header")
 )
 
-/**
-engine.io header to send or receive
-*/
+// engine.io header to send or receive
 type Header struct {
 	Sid          string   `json:"sid"`
 	Upgrades     []string `json:"upgrades"`
@@ -30,15 +28,12 @@ type Header struct {
 	PingTimeout  int      `json:"pingTimeout"`
 }
 
-/**
-socket.io connection handler
-
-use IsAlive to check that handler is still working
-use Dial to connect to websocket
-use In and Out channels for message exchange
-Close message means channel is closed
-ping is automatic
-*/
+// socket.io connection handler
+// use IsAlive to check that handler is still working
+// use Dial to connect to websocket
+// use In and Out channels for message exchange
+// Close message means channel is closed
+// ping is automatic
 type Channel struct {
 	conn transport.Connection
 
@@ -57,9 +52,7 @@ type Channel struct {
 	requestHeader http.Header
 }
 
-/**
-create channel, map, and set active
-*/
+// create channel, map, and set active
 func (c *Channel) initChannel() {
 	//TODO: queueBufferSize from constant to server or client variable
 	c.out = make(chan string, queueBufferSize)
@@ -69,16 +62,12 @@ func (c *Channel) initChannel() {
 	c.alive = true
 }
 
-/**
-Get id of current socket connection
-*/
+// Get id of current socket connection
 func (c *Channel) Id() string {
 	return c.header.Sid
 }
 
-/**
-Checks that Channel is still alive
-*/
+// Checks that Channel is still alive
 func (c *Channel) IsAlive() bool {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
@@ -95,9 +84,7 @@ func (c *Channel) Stub() error {
 	return StubChannel(c, &c.server.methods, nil)
 }
 
-/**
-Close channel
-*/
+// Close channel
 func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
@@ -125,9 +112,7 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	return nil
 }
 
-/**
-Stub channel
-*/
+// Stub channel
 func StubChannel(c *Channel, m *methods, args ...interface{}) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
@@ -211,9 +196,7 @@ func AmountOfOverflooded() int64 {
 	return int64(len(overflooded))
 }
 
-/**
-outgoing messages loop, sends messages from channel to socket
-*/
+// outgoing messages loop, sends messages from channel to socket
 func outLoop(c *Channel, m *methods) error {
 	for {
 		outBufferLen := len(c.out)
@@ -247,9 +230,7 @@ func outLoop(c *Channel, m *methods) error {
 	return nil
 }
 
-/**
-Pinger sends ping messages for keeping connection alive
-*/
+// Pinger sends ping messages for keeping connection alive
 func pinger(c *Channel) {
 	for {
 		interval, _ := c.conn.PingParams()

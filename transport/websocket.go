@@ -135,14 +135,10 @@ func (wst *WebsocketTransport) HandleConnection(
 	return &WebsocketConnection{socket, wst}, nil
 }
 
-/**
-Websocket connection do not require any additional processing
-*/
+// Websocket connection do not require any additional processing
 func (wst *WebsocketTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 
-/**
-Returns websocket connection with default params
-*/
+// Returns websocket connection with default params
 func GetDefaultWebsocketTransport() *WebsocketTransport {
 	return &WebsocketTransport{
 		PingInterval:   WsDefaultPingInterval,

@@ -65,7 +65,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingConnection) Close() {
-	logging.Log().Info("PollingConnection close ", plc.sid)
+	logging.Log().Debug("PollingConnection close ", plc.sid)
 	plc.WriteMessage("6")
 	plc.Transport.sessions.Delete(plc.sid)
 }
@@ -166,9 +166,7 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-/**
-Returns polling transport with default params
-*/
+// Returns polling transport with default params
 func GetDefaultPollingTransport() *PollingTransport {
 	return &PollingTransport{
 		PingInterval:   PlDefaultPingInterval,
