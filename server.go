@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/geneva-lake/golang-socketio/logging"
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
 	"log"
-	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 const (
@@ -176,7 +176,6 @@ func (c *Channel) BroadcastTo(room, method string, args interface{}) {
 	c.server.BroadcastTo(room, method, args)
 }
 
-
 // Broadcast message to all room channels
 func (s *Server) BroadcastTo(room, method string, args interface{}) {
 	s.channelsLock.RLock()
@@ -193,7 +192,6 @@ func (s *Server) BroadcastTo(room, method string, args interface{}) {
 		}
 	}
 }
-
 
 // Broadcast to all clients
 func (s *Server) BroadcastToAll(method string, args interface{}) {
@@ -300,7 +298,6 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 	s.callLoopEvent(c, OnConnection)
 }
 
-
 // Setup event loop when upgrading connection
 func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string,
 	requestHeader http.Header, sid string) {
@@ -341,7 +338,6 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 	cp.Stub()
 }
 
-
 // implements ServeHTTP function from http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session := r.URL.Query().Get("sid")
@@ -359,7 +355,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-		logging.Log().Debug("PollingConnection created", )
+		logging.Log().Debug("PollingConnection created")
 		conn.(*transport.PollingConnection).PollingWriter(w, r)
 	} else if tsp == "websocket" {
 		if session != "" {
@@ -370,7 +366,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			s.SetupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
-			logging.Log().Debug("WebsocketConnection upgraded", )
+			logging.Log().Debug("WebsocketConnection upgraded")
 			return
 		}
 
@@ -379,7 +375,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
-		logging.Log().Debug("WebsocketConnection created", )
+		logging.Log().Debug("WebsocketConnection created")
 	}
 }
 
