@@ -34,6 +34,8 @@ type PollingConnection struct {
 	sid       string
 }
 
+// Realisation interface function, wait for incoming message
+// from http request
 func (plc *PollingConnection) GetMessage() (string, error) {
 	select {
 	case <-time.After(plc.Transport.ReceiveTimeout):
@@ -49,9 +51,12 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 	}
 }
 
+// Realisation interface function, write message to channel
+// and to PollingWriter
 func (plc *PollingConnection) WriteMessage(message string) error {
 	logging.Log().Debug("WriteMessage ", message)
 	plc.eventsOut <- message
+	logging.Log().Debug("Writed Message to eventsOut", message)
 	select {
 	case <-time.After(plc.Transport.SendTimeout):
 		return errors.New("Write time out")
@@ -118,6 +123,7 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 	return nil, nil
 }
 
+// Create new PollingConnection
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	eventChan := make(chan string, 100)
 	eventOutChan := make(chan string, 100)
@@ -136,6 +142,7 @@ func (plt *PollingTransport) SetSid(sid string, conn Connection) {
 	conn.(*PollingConnection).sid = sid
 }
 
+// Serve is for receiving messages from client, simple decoding also here
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.URL.Query().Get("sid")
 	conn, exists := plt.sessions.Get(sessionId)
@@ -181,6 +188,7 @@ func GetDefaultPollingTransport() *PollingTransport {
 	}
 }
 
+// PollingWriter for write polling answer
 func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Request) {
 	setHeaders(w)
 	select {

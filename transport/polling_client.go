@@ -92,6 +92,7 @@ func (plt *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *ht
 func (plt *PollingClientTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 func (plt *PollingClientTransport) SetSid(sid string, conn Connection)           {}
 
+// Connecting to server, 3 http requests for connecting sequence
 func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	plc := &PollingClientConnection{
 		transport: plt,

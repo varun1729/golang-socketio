@@ -15,7 +15,7 @@ Examples directory contains simple client and server.
 
 ```go
 	//create
-	server := gosocketio.NewServer(transport.GetDefaultWebsocketTransport())
+	server := gosocketio.NewServer()
 
 	//handle connected
 	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
@@ -72,7 +72,7 @@ var socket = io('ws://yourdomain.com', {transports: ['websocket']});
 ```go
     //create server instance, you can setup transport parameters or get the default one
     //look at websocket.go for parameters description
-	server := gosocketio.NewServer(transport.GetDefaultWebsocketTransport())
+	server := gosocketio.NewServer()
 
 	// --- this is default handlers
 

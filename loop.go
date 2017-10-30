@@ -112,7 +112,7 @@ func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
 	return nil
 }
 
-// Stub channel
+// Stub channel when upgrading transport
 func StubChannel(c *Channel, m *methods, args ...interface{}) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
@@ -128,6 +128,7 @@ func StubChannel(c *Channel, m *methods, args ...interface{}) error {
 	}
 	c.conn.Close()
 	c.alive = false
+
 	//clean outloop
 	for len(c.out) > 0 {
 		<-c.out
@@ -243,6 +244,7 @@ func pinger(c *Channel) {
 	}
 }
 
+// Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
 	time.Sleep(1 * time.Second)
 	m.callLoopEvent(c, OnConnection)

@@ -301,7 +301,7 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 }
 
 
-// Setup event loop for given connection
+// Setup event loop when upgrading connection
 func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string,
 	requestHeader http.Header, sid string) {
 	logging.Log().Debug("SetupUpgradeEventLoop")
@@ -336,6 +336,7 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 	logging.Log().Debug("SetupUpgradeEventLoop go loops")
 	onConnectStore(c)
 
+	// synchronize stubbing polling channel with receiving "2probe" message
 	<-c.upgraded
 	cp.Stub()
 }
