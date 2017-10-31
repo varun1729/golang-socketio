@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 const (
@@ -38,25 +39,30 @@ type WebsocketConnection struct {
 }
 
 func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
+	logging.Log().Debug("GetMessage ws begin")
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
 	msgType, reader, err := wsc.socket.NextReader()
 	if err != nil {
+		logging.Log().Debug("ws reading err ", err)
 		return "", err
 	}
 
 	//support only text messages exchange
 	if msgType != websocket.TextMessage {
+		logging.Log().Debug("ws reading err ErrorBinaryMessage")
 		return "", ErrorBinaryMessage
 	}
 
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
+		logging.Log().Debug("ws reading err ErrorBadBuffer")
 		return "", ErrorBadBuffer
 	}
 	text := string(data)
-
+	logging.Log().Debug("GetMessage ws text ", text)
 	//empty messages are not allowed
 	if len(text) == 0 {
+		logging.Log().Debug("ws reading err ErrorPacketWrong")
 		return "", ErrorPacketWrong
 	}
 
@@ -66,6 +72,7 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 func (wsc *WebsocketTransport) SetSid(sid string, conn Connection) {}
 
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
+	logging.Log().Debug("WriteMessage ws ", message)
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
 	if err != nil {
@@ -82,6 +89,7 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 }
 
 func (wsc *WebsocketConnection) Close() {
+	logging.Log().Debug("ws close")
 	wsc.socket.Close()
 }
 
@@ -127,14 +135,10 @@ func (wst *WebsocketTransport) HandleConnection(
 	return &WebsocketConnection{socket, wst}, nil
 }
 
-/**
-Websocket connection do not require any additional processing
-*/
+// Websocket connection do not require any additional processing
 func (wst *WebsocketTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 
-/**
-Returns websocket connection with default params
-*/
+// Returns websocket connection with default params
 func GetDefaultWebsocketTransport() *WebsocketTransport {
 	return &WebsocketTransport{
 		PingInterval:   WsDefaultPingInterval,

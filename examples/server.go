@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mtfelian/golang-socketio"
-	"github.com/mtfelian/golang-socketio/transport"
+	"github.com/geneva-lake/golang-socketio"
+	_"github.com/geneva-lake/golang-socketio/transport"
+
 	"github.com/mtfelian/utils"
 )
 
@@ -32,7 +33,7 @@ func main() {
 
 	fmt.Println("assetsDir:", assetsDir)
 
-	server := gosocketio.NewServer(transport.GetDefaultPollingTransport())
+	server := gosocketio.NewServer()
 
 	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
 		log.Println("Connected")

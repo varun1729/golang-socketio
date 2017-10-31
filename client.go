@@ -5,7 +5,6 @@ import (
   "time"
 
 	"github.com/geneva-lake/golang-socketio/transport"
-	"github.com/mtfelian/golang-socketio/transport"
 )
 
 const (
@@ -18,9 +17,7 @@ const (
 	socketioPollingUrl    = "/socket.io/?EIO=3&transport=polling"
 )
 
-/**
-Socket.io client representation
-*/
+// Socket.io client representation
 type Client struct {
 	methods
 	Channel
@@ -45,14 +42,10 @@ func GetUrlPolling(host string, port int, secure bool) string {
 	return prefix + host + ":" + strconv.Itoa(port) + socketioPollingUrl
 }
 
-/**
-connect to host and initialise socket.io protocol
-
-The correct ws protocol url example:
-ws://myserver.com/socket.io/?EIO=3&transport=websocket
-
-You can use GetUrlByHost for generating correct url
-*/
+// connect to host and initialise socket.io protocol
+// The correct ws protocol url example:
+// ws://myserver.com/socket.io/?EIO=3&transport=websocket
+// You can use GetUrlByHost for generating correct url
 func Dial(url string, tr transport.Transport) (*Client, error) {
 	c := &Client{}
 	c.initChannel()
@@ -78,9 +71,7 @@ func Dial(url string, tr transport.Transport) (*Client, error) {
 	return c, nil
 }
 
-/**
-Close client connection
-*/
+// Close client connection
 func (c *Client) Close() {
 	CloseChannel(&c.Channel, &c.methods)
 }

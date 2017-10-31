@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 var (
@@ -14,9 +14,7 @@ var (
 	ErrorSocketOverflood = errors.New("Socket overflood")
 )
 
-/**
-Send message packet to socket
-*/
+// Send message packet to socket
 func send(msg *protocol.Message, c *Channel, args interface{}) error {
 	// preventing json/encoding "index out of range" panic
 	defer func() {
@@ -48,9 +46,7 @@ func send(msg *protocol.Message, c *Channel, args interface{}) error {
 	return nil
 }
 
-/**
-Create packet based on given data and send it
-*/
+// Create packet based on given data and send it
 func (c *Channel) Emit(method string, args interface{}) error {
 	msg := &protocol.Message{
 		Type:   protocol.MessageTypeEmit,
@@ -60,9 +56,7 @@ func (c *Channel) Emit(method string, args interface{}) error {
 	return send(msg, c, args)
 }
 
-/**
-Create ack packet based on given data and send it and receive response
-*/
+// Create ack packet based on given data and send it and receive response
 func (c *Channel) Ack(method string, args interface{}, timeout time.Duration) (string, error) {
 	msg := &protocol.Message{
 		Type:   protocol.MessageTypeAckRequest,
