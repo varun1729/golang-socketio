@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/mtfelian/golang-socketio/logging"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mtfelian/golang-socketio/logging"
 )
 
 type OpenSequence struct {
@@ -105,11 +106,13 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 		logging.Log().Debug("error in get client: ", err)
 		return nil, err
 	}
+
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logging.Log().Debug("error read resp body: ", err)
 		return nil, err
 	}
+
 	resp.Body.Close()
 	bodyString := string(bodyBytes)
 	logging.Log().Debug("bodyString: ", bodyString)
@@ -134,11 +137,13 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 		logging.Log().Debug("error in get client: ", err)
 		return nil, err
 	}
+
 	bodyBytes, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logging.Log().Debug("error read resp body: ", err)
 		return nil, err
 	}
+
 	resp.Body.Close()
 	bodyString = string(bodyBytes)
 	logging.Log().Debug("bodyString: ", bodyString)

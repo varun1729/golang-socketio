@@ -125,8 +125,8 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 
 // Create new PollingConnection
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
-	eventChan := make(chan string, 100)
-	eventOutChan := make(chan string, 100)
+	eventChan := make(chan string)
+	eventOutChan := make(chan string)
 	plc := &PollingConnection{
 		Transport: plt,
 		eventsIn:  eventChan,

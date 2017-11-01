@@ -246,6 +246,6 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
-	time.Sleep(1 * time.Second)
+	//time.Sleep(1 * time.Second)
 	m.callLoopEvent(c, OnConnection)
 }
