@@ -64,7 +64,6 @@ func Dial(url string, tr transport.Transport) (*Client, error) {
 	case *transport.PollingClientTransport:
 		//time.Sleep(1 * time.Second)
 		go pollingClientListener(&c.Channel, &c.methods)
-	default:
 	}
 
 	return c, nil

@@ -16,6 +16,7 @@ func init() {
 	}
 }
 
+// Log returns the logger object
 func Log() *logrus.Logger {
 	return log
 }

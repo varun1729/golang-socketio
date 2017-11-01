@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	OnConnection        = "connection"
-	OnPollingConnection = "pollingConnection"
-	OnDisconnection     = "disconnection"
-	OnError             = "error"
+	OnConnection    = "connection"
+	OnDisconnection = "disconnection"
+	OnError         = "error"
 )
 
 // System handler function for internal event processing
@@ -99,8 +98,8 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 
 		data := f.getArgs()
 		logging.Log().Debug("f.getArgs ", data)
-		err := json.Unmarshal([]byte(msg.Args), &data)
-		if err != nil {
+
+		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
 			return
 		}
@@ -116,10 +115,9 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 
 		var result []reflect.Value
 		if f.ArgsPresent {
-			//data type should be defined for unmarshall
+			// data type should be defined for Unmarshal()
 			data := f.getArgs()
-			err := json.Unmarshal([]byte(msg.Args), &data)
-			if err != nil {
+			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 				return
 			}
 			result = f.callFunc(c, data)
@@ -131,6 +129,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 			Type:  protocol.MessageTypeAckResponse,
 			AckId: msg.AckId,
 		}
+
 		send(ack, c, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:

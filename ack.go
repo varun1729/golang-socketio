@@ -49,5 +49,6 @@ func (a *ackProcessor) getWaiter(id int) (chan string, error) {
 	if waiter, ok := a.resultWaiters[id]; ok {
 		return waiter, nil
 	}
+
 	return nil, ErrorWaiterNotFound
 }
