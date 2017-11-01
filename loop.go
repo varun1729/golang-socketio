@@ -2,7 +2,6 @@ package gosocketio
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -14,10 +13,6 @@ import (
 
 const (
 	queueBufferSize = 500
-)
-
-var (
-	ErrorWrongHeader = errors.New("Wrong header")
 )
 
 // engine.io header to send or receive
@@ -167,7 +162,6 @@ func inLoop(c *Channel, m *methods) error {
 		}
 
 		msg, err := protocol.Decode(pkg)
-
 		if err != nil {
 			logging.Log().Debug("Decoding err: ", err)
 			CloseChannel(c, m)
@@ -196,6 +190,7 @@ func inLoop(c *Channel, m *methods) error {
 			go m.processIncomingMessage(c, msg)
 		}
 	}
+
 	return nil
 }
 
@@ -229,14 +224,11 @@ func outLoop(c *Channel, m *methods) error {
 
 		msg := <-c.out
 
-		if msg == protocol.CloseMessage {
+		if msg == protocol.CloseMessage || msg == protocol.StubMessage {
 			return nil
 		}
-		if msg == protocol.StubMessage {
-			return nil
-		}
-		err := c.conn.WriteMessage(msg)
-		if err != nil {
+
+		if err := c.conn.WriteMessage(msg); err != nil {
 			return CloseChannel(c, m)
 		}
 	}
@@ -258,6 +250,6 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
-	//time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	m.callLoopEvent(c, OnConnection)
 }

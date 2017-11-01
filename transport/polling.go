@@ -72,7 +72,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 
 func (plc *PollingConnection) Close() {
 	logging.Log().Debug("PollingConnection close ", plc.sid)
-	plc.WriteMessage("6")
+	plc.WriteMessage(protocol.CloseMessage)
 	plc.Transport.sessions.Delete(plc.sid)
 }
 
@@ -220,7 +220,10 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 
 			defer conn.Close()
 
-			buffer.WriteString("HTTP/1.1 200 OK\r\nCache-Control: no-cache, private\r\nContent-Length: 3\r\nDate: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
+			buffer.WriteString("HTTP/1.1 200 OK\r\n" +
+				"Cache-Control: no-cache, private\r\n" +
+				"Content-Length: 3\r\n" +
+				"Date: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
 			buffer.WriteString("1:6")
 			buffer.Flush()
 			logging.Log().Debug("hijack return")

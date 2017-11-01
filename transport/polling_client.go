@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mtfelian/golang-socketio/logging"
+	"github.com/mtfelian/golang-socketio/protocol"
 )
 
 type OpenSequence struct {
@@ -77,7 +78,7 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingClientConnection) Close() {
-	plc.WriteMessage("1")
+	plc.WriteMessage(protocol.CloseMessage)
 }
 
 func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
@@ -126,7 +127,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
-	if string(body[0]) == "0" {
+	if string(body[0]) == protocol.OpenMessage {
 		bodyBytes2 := []byte(body[1:])
 		var openSequence OpenSequence
 
@@ -159,7 +160,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	index = strings.Index(bodyString, ":")
 	body = bodyString[index+1:]
 
-	if body == "40" {
+	if body == protocol.EmptyMessage {
 		return plc, nil
 	}
 

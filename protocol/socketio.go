@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	open               = "0"
+	OpenMessage        = "0"
 	msg                = "4"
-	emptyMessage       = "40"
+	EmptyMessage       = "40"
 	closeClientMessage = "41"
 	commonMessage      = "42"
 	ackMessage         = "43"
@@ -32,7 +32,7 @@ var (
 func typeToText(msgType int) (string, error) {
 	switch msgType {
 	case MessageTypeOpen:
-		return open, nil
+		return OpenMessage, nil
 	case MessageTypeClose:
 		return CloseMessage, nil
 	case MessageTypePing:
@@ -40,7 +40,7 @@ func typeToText(msgType int) (string, error) {
 	case MessageTypePong:
 		return PongMessage, nil
 	case MessageTypeEmpty:
-		return emptyMessage, nil
+		return EmptyMessage, nil
 	case MessageTypeEmit, MessageTypeAckRequest:
 		return commonMessage, nil
 	case MessageTypeAckResponse:
@@ -93,7 +93,7 @@ func getMessageType(data string) (int, error) {
 		return 0, ErrorWrongMessageType
 	}
 	switch data[0:1] {
-	case open:
+	case OpenMessage:
 		return MessageTypeOpen, nil
 	case CloseMessage:
 		return MessageTypeClose, nil
@@ -108,7 +108,7 @@ func getMessageType(data string) (int, error) {
 			return 0, ErrorWrongMessageType
 		}
 		switch data[0:2] {
-		case emptyMessage:
+		case EmptyMessage:
 			return MessageTypeEmpty, nil
 		case closeClientMessage:
 			return MessageTypeClose, nil
