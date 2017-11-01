@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/geneva-lake/golang-socketio/logging"
-	"github.com/geneva-lake/golang-socketio/protocol"
-	"github.com/geneva-lake/golang-socketio/transport"
+	"github.com/mtfelian/golang-socketio/logging"
+	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/mtfelian/golang-socketio/transport"
 	"log"
 )
 
@@ -265,8 +265,7 @@ func (s *Server) SendOpenSequence(c *Channel) {
 }
 
 // Setup event loop for given connection
-func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
-	requestHeader http.Header) {
+func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string, requestHeader http.Header) {
 
 	interval, timeout := conn.PingParams()
 	hdr := Header{
@@ -276,14 +275,14 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
 
-	c := &Channel{}
-	c.conn = conn
-	c.ip = remoteAddr
-	c.requestHeader = requestHeader
+	c := &Channel{
+		conn:          conn,
+		ip:            remoteAddr,
+		requestHeader: requestHeader,
+		server:        s,
+		header:        hdr,
+	}
 	c.initChannel()
-
-	c.server = s
-	c.header = hdr
 
 	switch conn.(type) {
 	case *transport.PollingConnection:
@@ -299,9 +298,9 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string,
 }
 
 // Setup event loop when upgrading connection
-func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string,
-	requestHeader http.Header, sid string) {
+func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string, requestHeader http.Header, sid string) {
 	logging.Log().Debug("SetupUpgradeEventLoop")
+
 	cp, err := s.GetChannel(sid)
 	if err != nil {
 		log.Println("can't find channel for session: ", sid)
@@ -317,15 +316,15 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
 
-	c := &Channel{}
-	c.conn = conn
-	c.ip = remoteAddr
-	c.requestHeader = requestHeader
+	c := &Channel{
+		conn:          conn,
+		ip:            remoteAddr,
+		requestHeader: requestHeader,
+		server:        s,
+		header:        hdr,
+	}
 	c.initChannel()
 	logging.Log().Debug("SetupUpgradeEventLoop init channel")
-
-	c.server = s
-	c.header = hdr
 
 	go inLoop(c, &s.methods)
 	go outLoop(c, &s.methods)
@@ -341,9 +340,10 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 // implements ServeHTTP function from http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session := r.URL.Query().Get("sid")
-	tsp := r.URL.Query().Get("transport")
+	transportName := r.URL.Query().Get("transport")
 
-	if tsp == "polling" {
+	switch transportName {
+	case "polling":
 		// session is empty in first polling request, or first and single websocket request
 		if session != "" {
 			s.polling.Serve(w, r)
@@ -354,10 +354,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
+
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
 		logging.Log().Debug("PollingConnection created")
 		conn.(*transport.PollingConnection).PollingWriter(w, r)
-	} else if tsp == "websocket" {
+
+	case "websocket":
 		if session != "" {
 			logging.Log().Debug("upgrade HandleConnection")
 			conn, err := s.websocket.HandleConnection(w, r)
@@ -374,6 +376,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return
 		}
+
 		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
 		logging.Log().Debug("WebsocketConnection created")
 	}
@@ -397,13 +400,15 @@ func (s *Server) AmountOfRooms() int64 {
 
 // Create new socket.io server
 func NewServer() *Server {
-	s := Server{}
+	s := Server{
+		websocket: transport.GetDefaultWebsocketTransport(),
+		polling:   transport.GetDefaultPollingTransport(),
+		channels:  make(map[string]map[*Channel]struct{}),
+		rooms:     make(map[*Channel]map[string]struct{}),
+		sids:      make(map[string]*Channel),
+	}
+
 	s.initMethods()
-	s.websocket = transport.GetDefaultWebsocketTransport()
-	s.polling = transport.GetDefaultPollingTransport()
-	s.channels = make(map[string]map[*Channel]struct{})
-	s.rooms = make(map[*Channel]map[string]struct{})
-	s.sids = make(map[string]*Channel)
 	s.onConnection = onConnectStore
 	s.onDisconnection = onDisconnectCleanup
 

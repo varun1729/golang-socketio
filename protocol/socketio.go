@@ -11,16 +11,17 @@ const (
 	open               = "0"
 	msg                = "4"
 	emptyMessage       = "40"
+	closeClientMessage = "41"
 	commonMessage      = "42"
 	ackMessage         = "43"
-	closeClientMessage = "41"
-	upgradeMessage     = "45"
 
-	CloseMessage = "1"
-	PingMessage  = "2"
-	PongMessage  = "3"
-	UpgradeMessage = "5"
-	StubMessage = "stub"
+	CloseMessage     = "1"
+	PingMessage      = "2"
+	PongMessage      = "3"
+	ProbePingMessage = "2probe"
+	ProbePongMessage = "3probe"
+	UpgradeMessage   = "5"
+	StubMessage      = "stub"
 )
 
 var (
@@ -54,8 +55,7 @@ func Encode(msg *Message) (string, error) {
 		return "", err
 	}
 
-	if msg.Type == MessageTypeEmpty || msg.Type == MessageTypePing ||
-		msg.Type == MessageTypePong {
+	if msg.Type == MessageTypeEmpty || msg.Type == MessageTypePing || msg.Type == MessageTypePong {
 		return result, nil
 	}
 
@@ -176,8 +176,7 @@ func getMethod(text string) (method, restText string, err error) {
 
 func Decode(data string) (*Message, error) {
 	var err error
-	msg := &Message{}
-	msg.Source = data
+	msg := &Message{Source: data}
 
 	msg.Type, err = getMessageType(data)
 	if err != nil {

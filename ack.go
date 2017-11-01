@@ -9,7 +9,6 @@ var (
 	ErrorWaiterNotFound = errors.New("Waiter not found")
 )
 
-
 type ackProcessor struct {
 	counter     int
 	counterLock sync.Mutex
@@ -50,5 +49,6 @@ func (a *ackProcessor) getWaiter(id int) (chan string, error) {
 	if waiter, ok := a.resultWaiters[id]; ok {
 		return waiter, nil
 	}
+
 	return nil, ErrorWaiterNotFound
 }
