@@ -6,15 +6,15 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/logging"
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 const (
-	OnConnection    = "connection"
-	OnPollingConnection    = "pollingConnection"
-	OnDisconnection = "disconnection"
-	OnError         = "error"
+	OnConnection        = "connection"
+	OnPollingConnection = "pollingConnection"
+	OnDisconnection     = "disconnection"
+	OnError             = "error"
 )
 
 // System handler function for internal event processing
@@ -90,7 +90,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 			return
 		}
 
-		logging.Log().Debug("found method ",f)
+		logging.Log().Debug("found method ", f)
 
 		if !f.ArgsPresent {
 			f.callFunc(c, &struct{}{})

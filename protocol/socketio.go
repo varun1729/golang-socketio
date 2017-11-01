@@ -16,11 +16,11 @@ const (
 	closeClientMessage = "41"
 	upgradeMessage     = "45"
 
-	CloseMessage = "1"
-	PingMessage  = "2"
-	PongMessage  = "3"
+	CloseMessage   = "1"
+	PingMessage    = "2"
+	PongMessage    = "3"
 	UpgradeMessage = "5"
-	StubMessage = "stub"
+	StubMessage    = "stub"
 )
 
 var (

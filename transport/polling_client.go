@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/geneva-lake/golang-socketio/logging"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 type OpenSequence struct {

@@ -2,7 +2,7 @@ package gosocketio
 
 import (
 	"strconv"
-  "time"
+	"time"
 
 	"github.com/geneva-lake/golang-socketio/transport"
 )

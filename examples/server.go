@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/geneva-lake/golang-socketio"
-	_"github.com/geneva-lake/golang-socketio/transport"
+	_ "github.com/geneva-lake/golang-socketio/transport"
 
 	"github.com/mtfelian/utils"
 )
@@ -62,8 +62,6 @@ func main() {
 		//c.Emit("send", "send received")
 		return "send received" //"OK"
 	})
-
-
 
 	server.On("another", func(c *gosocketio.Channel, param string) string {
 		log.Println("came another", param)

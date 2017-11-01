@@ -9,7 +9,6 @@ var (
 	ErrorWaiterNotFound = errors.New("Waiter not found")
 )
 
-
 type ackProcessor struct {
 	counter     int
 	counterLock sync.Mutex

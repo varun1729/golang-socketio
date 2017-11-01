@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/logging"
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 const (
@@ -18,8 +18,8 @@ const (
 	PlDefaultPingTimeout    = 60 * time.Second
 	PlDefaultReceiveTimeout = 60 * time.Second
 	PlDefaultSendTimeout    = 60 * time.Second
-	StopMessage            = "stop"
-	UpgradedMessage        = "upgrade"
+	StopMessage             = "stop"
+	UpgradedMessage         = "upgrade"
 )
 
 type PollingTransportParams struct {

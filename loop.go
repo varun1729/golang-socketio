@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/geneva-lake/golang-socketio/logging"
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
-	"github.com/geneva-lake/golang-socketio/logging"
 )
 
 const (
