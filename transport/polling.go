@@ -71,7 +71,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 
 func (plc *PollingConnection) Close() {
 	logging.Log().Debug("PollingConnection close ", plc.sid)
-	plc.WriteMessage("6")
+	plc.WriteMessage(protocol.CloseMessage)
 	plc.Transport.sessions.Delete(plc.sid)
 }
 
@@ -160,11 +160,14 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 			logging.Log().Debug("error in PollingTransport.Serve():", err)
 			return
 		}
+
 		bodyString := string(bodyBytes)
 		logging.Log().Debug("post mseg before split: ", bodyString)
 		index := strings.Index(bodyString, ":")
 		body := bodyString[index+1:]
+
 		setHeaders(w)
+
 		logging.Log().Debug("post mseg: ", body)
 		w.Write([]byte("ok"))
 		logging.Log().Debug("post response writed ")
@@ -200,12 +203,14 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 		events = strconv.Itoa(len(events)) + ":" + events
 		if events == "1:6" {
 			logging.Log().Debug("writing message 1:6")
+
 			hj, ok := w.(http.Hijacker)
 			if !ok {
 				http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
 				return
 			}
-			conn, bufrw, err := hj.Hijack()
+
+			conn, buffer, err := hj.Hijack()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -213,9 +218,12 @@ func (plc *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.Reque
 
 			defer conn.Close()
 
-			bufrw.WriteString("HTTP/1.1 200 OK\r\nCache-Control: no-cache, private\r\nContent-Length: 3\r\nDate: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
-			bufrw.WriteString("1:6")
-			bufrw.Flush()
+			buffer.WriteString("HTTP/1.1 200 OK\r\n" +
+				"Cache-Control: no-cache, private\r\n" +
+				"Content-Length: 3\r\n" +
+				"Date: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
+			buffer.WriteString("1:6")
+			buffer.Flush()
 			logging.Log().Debug("hijack return")
 			plc.errors <- "0"
 			plc.eventsIn <- StopMessage
@@ -238,7 +246,7 @@ func setHeaders(w http.ResponseWriter) {
 	// We are going to return JSON no matter what:
 	w.Header().Set("Content-Type", "application/json")
 	// Don't cache response:
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1.
-	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0.
-	w.Header().Set("Expires", "0")                                         // Proxies.
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate") // HTTP 1.1
+	w.Header().Set("Pragma", "no-cache")                                   // HTTP 1.0
+	w.Header().Set("Expires", "0")                                         // Proxies
 }

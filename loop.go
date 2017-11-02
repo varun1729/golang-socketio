@@ -2,7 +2,6 @@ package gosocketio
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"sync"
 	_ "time"
@@ -15,10 +14,6 @@ import (
 
 const (
 	queueBufferSize = 500
-)
-
-var (
-	ErrorWrongHeader = errors.New("Wrong header")
 )
 
 // engine.io header to send or receive
@@ -77,52 +72,61 @@ func (c *Channel) IsAlive() bool {
 
 // Close закрывает соединение для клиента (канала)
 func (c *Channel) Close() error {
-	return CloseChannel(c, &c.server.methods, nil)
+	return CloseChannel(c, &c.server.methods)
 }
 
 // Close закрывает соединение для поллинга (канала) при апгрейде
 func (c *Channel) Stub() error {
-	return StubChannel(c, &c.server.methods, nil)
+	return StubChannel(c)
 }
 
 // Close channel
-func CloseChannel(c *Channel, m *methods, args ...interface{}) error {
+func CloseChannel(c *Channel, m *methods) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
 		logging.Log().Debug("close channel type: PollingConnection")
 	case *transport.WebsocketConnection:
 		logging.Log().Debug("close channel type: WebsocketConnection")
 	}
+
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
+
 	if !c.alive {
 		//already closed
 		return nil
 	}
+
 	c.conn.Close()
 	c.alive = false
+
 	//clean outloop
 	for len(c.out) > 0 {
 		<-c.out
 	}
+
 	c.out <- protocol.CloseMessage
 	m.callLoopEvent(c, OnDisconnection)
+
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
+
 	return nil
 }
 
 // Stub channel when upgrading transport
-func StubChannel(c *Channel, m *methods, args ...interface{}) error {
+func StubChannel(c *Channel) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
 		logging.Log().Debug("Stub channel type: PollingConnection")
 	case *transport.WebsocketConnection:
 		logging.Log().Debug("Stub channel type: WebsocketConnection")
 	}
+
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
+
 	if !c.alive {
 		//already closed
 		return nil
@@ -134,10 +138,13 @@ func StubChannel(c *Channel, m *methods, args ...interface{}) error {
 	for len(c.out) > 0 {
 		<-c.out
 	}
+
 	c.out <- protocol.StubMessage
+
 	overfloodedLock.Lock()
 	delete(overflooded, c)
 	overfloodedLock.Unlock()
+
 	return nil
 }
 
@@ -147,7 +154,7 @@ func inLoop(c *Channel, m *methods) error {
 		pkg, err := c.conn.GetMessage()
 		if err != nil {
 			logging.Log().Debug("c.conn.GetMessage err ", err, " pkg: ", pkg)
-			return CloseChannel(c, m, err)
+			return CloseChannel(c, m)
 		}
 
 		if pkg == transport.StopMessage {
@@ -156,10 +163,9 @@ func inLoop(c *Channel, m *methods) error {
 		}
 
 		msg, err := protocol.Decode(pkg)
-
 		if err != nil {
-			logging.Log().Debug("Decoding err: ", err, "msg: ", pkg)
-			CloseChannel(c, m, protocol.ErrorWrongPacket)
+			logging.Log().Debug("Decoding err: ", err)
+			CloseChannel(c, m)
 			return err
 		}
 
@@ -167,14 +173,14 @@ func inLoop(c *Channel, m *methods) error {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debug("protocol.MessageTypeOpen: ", msg)
 			if err := json.Unmarshal([]byte(msg.Source[1:]), &c.header); err != nil {
-				CloseChannel(c, m, ErrorWrongHeader)
+				CloseChannel(c, m)
 			}
 			m.callLoopEvent(c, OnConnection)
 		case protocol.MessageTypePing:
 			logging.Log().Debug("get MessageTypePing ", msg, " source ", msg.Source)
-			if msg.Source == "2probe" {
+			if msg.Source == protocol.ProbePingMessage {
 				logging.Log().Debug("get 2probe")
-				c.out <- "3probe"
+				c.out <- protocol.ProbePongMessage
 				c.upgraded <- transport.UpgradedMessage
 			} else {
 				c.out <- protocol.PongMessage
@@ -185,6 +191,7 @@ func inLoop(c *Channel, m *methods) error {
 			go m.processIncomingMessage(c, msg)
 		}
 	}
+
 	return nil
 }
 
@@ -205,7 +212,7 @@ func outLoop(c *Channel, m *methods) error {
 		logging.Log().Debug("outBufferLen: ", outBufferLen)
 		if outBufferLen >= queueBufferSize-1 {
 			logging.Log().Debug("outBufferLen >= queueBufferSize-1")
-			return CloseChannel(c, m, ErrorSocketOverflood)
+			return CloseChannel(c, m)
 		} else if outBufferLen > int(queueBufferSize/2) {
 			overfloodedLock.Lock()
 			overflooded[c] = struct{}{}
@@ -218,15 +225,12 @@ func outLoop(c *Channel, m *methods) error {
 
 		msg := <-c.out
 
-		if msg == protocol.CloseMessage {
+		if msg == protocol.CloseMessage || msg == protocol.StubMessage {
 			return nil
 		}
-		if msg == protocol.StubMessage {
-			return nil
-		}
-		err := c.conn.WriteMessage(msg)
-		if err != nil {
-			return CloseChannel(c, m, err)
+
+		if err := c.conn.WriteMessage(msg); err != nil {
+			return CloseChannel(c, m)
 		}
 	}
 	return nil
@@ -247,6 +251,8 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
+
 	//time.Sleep(1 * time.Second)
+
 	m.callLoopEvent(c, OnConnection)
 }

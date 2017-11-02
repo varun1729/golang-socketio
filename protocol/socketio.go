@@ -8,19 +8,20 @@ import (
 )
 
 const (
-	open               = "0"
+	OpenMessage        = "0"
 	msg                = "4"
-	emptyMessage       = "40"
+	EmptyMessage       = "40"
+	closeClientMessage = "41"
 	commonMessage      = "42"
 	ackMessage         = "43"
-	closeClientMessage = "41"
-	upgradeMessage     = "45"
 
-	CloseMessage = "1"
-	PingMessage  = "2"
-	PongMessage  = "3"
-	UpgradeMessage = "5"
-	StubMessage = "stub"
+	CloseMessage     = "1"
+	PingMessage      = "2"
+	PongMessage      = "3"
+	ProbePingMessage = "2probe"
+	ProbePongMessage = "3probe"
+	UpgradeMessage   = "5"
+	StubMessage      = "stub"
 )
 
 var (
@@ -31,7 +32,7 @@ var (
 func typeToText(msgType int) (string, error) {
 	switch msgType {
 	case MessageTypeOpen:
-		return open, nil
+		return OpenMessage, nil
 	case MessageTypeClose:
 		return CloseMessage, nil
 	case MessageTypePing:
@@ -39,7 +40,7 @@ func typeToText(msgType int) (string, error) {
 	case MessageTypePong:
 		return PongMessage, nil
 	case MessageTypeEmpty:
-		return emptyMessage, nil
+		return EmptyMessage, nil
 	case MessageTypeEmit, MessageTypeAckRequest:
 		return commonMessage, nil
 	case MessageTypeAckResponse:
@@ -54,8 +55,7 @@ func Encode(msg *Message) (string, error) {
 		return "", err
 	}
 
-	if msg.Type == MessageTypeEmpty || msg.Type == MessageTypePing ||
-		msg.Type == MessageTypePong {
+	if msg.Type == MessageTypeEmpty || msg.Type == MessageTypePing || msg.Type == MessageTypePong {
 		return result, nil
 	}
 
@@ -93,7 +93,7 @@ func getMessageType(data string) (int, error) {
 		return 0, ErrorWrongMessageType
 	}
 	switch data[0:1] {
-	case open:
+	case OpenMessage:
 		return MessageTypeOpen, nil
 	case CloseMessage:
 		return MessageTypeClose, nil
@@ -108,7 +108,7 @@ func getMessageType(data string) (int, error) {
 			return 0, ErrorWrongMessageType
 		}
 		switch data[0:2] {
-		case emptyMessage:
+		case EmptyMessage:
 			return MessageTypeEmpty, nil
 		case closeClientMessage:
 			return MessageTypeClose, nil
@@ -176,8 +176,7 @@ func getMethod(text string) (method, restText string, err error) {
 
 func Decode(data string) (*Message, error) {
 	var err error
-	msg := &Message{}
-	msg.Source = data
+	msg := &Message{Source: data}
 
 	msg.Type, err = getMessageType(data)
 	if err != nil {

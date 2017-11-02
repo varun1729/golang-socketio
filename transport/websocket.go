@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/geneva-lake/golang-socketio/logging"
+	"github.com/mtfelian/golang-socketio/logging"
 )
 
 const (
@@ -41,6 +41,7 @@ type WebsocketConnection struct {
 func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 	logging.Log().Debug("GetMessage ws begin")
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
+
 	msgType, reader, err := wsc.socket.NextReader()
 	if err != nil {
 		logging.Log().Debug("ws reading err ", err)
@@ -58,8 +59,10 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 		logging.Log().Debug("ws reading err ErrorBadBuffer")
 		return "", ErrorBadBuffer
 	}
+
 	text := string(data)
 	logging.Log().Debug("GetMessage ws text ", text)
+
 	//empty messages are not allowed
 	if len(text) == 0 {
 		logging.Log().Debug("ws reading err ErrorPacketWrong")
@@ -74,6 +77,7 @@ func (wsc *WebsocketTransport) SetSid(sid string, conn Connection) {}
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	logging.Log().Debug("WriteMessage ws ", message)
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
+
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
 	if err != nil {
 		return err
@@ -82,10 +86,8 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	if _, err := writer.Write([]byte(message)); err != nil {
 		return err
 	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
-	return nil
+
+	return writer.Close()
 }
 
 func (wsc *WebsocketConnection) Close() {
@@ -93,7 +95,7 @@ func (wsc *WebsocketConnection) Close() {
 	wsc.socket.Close()
 }
 
-func (wsc *WebsocketConnection) PingParams() (interval, timeout time.Duration) {
+func (wsc *WebsocketConnection) PingParams() (time.Duration, time.Duration) {
 	return wsc.transport.PingInterval, wsc.transport.PingTimeout
 }
 
@@ -108,7 +110,7 @@ type WebsocketTransport struct {
 	Headers http.Header
 }
 
-func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) {
+func (wst *WebsocketTransport) Connect(url string) (Connection, error) {
 	dialer := websocket.Dialer{}
 	socket, _, err := dialer.Dial(url, wst.Headers)
 	if err != nil {
@@ -118,8 +120,7 @@ func (wst *WebsocketTransport) Connect(url string) (conn Connection, err error) 
 	return &WebsocketConnection{socket, wst}, nil
 }
 
-func (wst *WebsocketTransport) HandleConnection(
-	w http.ResponseWriter, r *http.Request) (conn Connection, err error) {
+func (wst *WebsocketTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 
 	if r.Method != http.MethodGet {
 		http.Error(w, upgradeFailed+ErrorMethodNotAllowed.Error(), 503)
