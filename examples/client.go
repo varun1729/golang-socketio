@@ -50,6 +50,24 @@ func main() {
 
 	sendJoin(c)
 	c.Emit("send", "send sended")
+	c.Close()
+	c, err = gosocketio.Dial(
+		gosocketio.GetUrlPolling("localhost", 3811, false),
+		transport.GetDefaultPollingClientTransport())
+	if err != nil {
+		log.Fatal(err)
+	}
+	sendJoin(c)
+	c.Close()
+
+	c, err = gosocketio.Dial(
+		gosocketio.GetUrlPolling("localhost", 3811, false),
+		transport.GetDefaultPollingClientTransport())
+	if err != nil {
+		log.Fatal(err)
+	}
+	sendJoin(c)
+	//sendJoin(c)
 
 	err = c.On(gosocketio.OnDisconnection, func(h *gosocketio.Channel) {
 		//log.Fatal("Disconnected")

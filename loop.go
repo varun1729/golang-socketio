@@ -5,11 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"sync"
-	"time"
+	_ "time"
 
+	"github.com/geneva-lake/golang-socketio/logging"
 	"github.com/geneva-lake/golang-socketio/protocol"
 	"github.com/geneva-lake/golang-socketio/transport"
-	"github.com/geneva-lake/golang-socketio/logging"
+	"time"
 )
 
 const (
@@ -157,7 +158,7 @@ func inLoop(c *Channel, m *methods) error {
 		msg, err := protocol.Decode(pkg)
 
 		if err != nil {
-			logging.Log().Debug("Decoding err: ", err)
+			logging.Log().Debug("Decoding err: ", err, "msg: ", pkg)
 			CloseChannel(c, m, protocol.ErrorWrongPacket)
 			return err
 		}
@@ -246,6 +247,6 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
-	time.Sleep(1 * time.Second)
+	//time.Sleep(1 * time.Second)
 	m.callLoopEvent(c, OnConnection)
 }
