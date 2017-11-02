@@ -72,7 +72,7 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 
 func (plc *PollingConnection) Close() {
 	logging.Log().Debug("PollingConnection close ", plc.sid)
-	plc.WriteMessage(protocol.CloseMessage)
+	plc.WriteMessage("6")
 	plc.Transport.sessions.Delete(plc.sid)
 }
 
