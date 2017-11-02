@@ -6,9 +6,9 @@ import (
 	"sync"
 	_ "time"
 
-	"github.com/geneva-lake/golang-socketio/logging"
-	"github.com/geneva-lake/golang-socketio/protocol"
-	"github.com/geneva-lake/golang-socketio/transport"
+	"github.com/mtfelian/golang-socketio/logging"
+	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/mtfelian/golang-socketio/transport"
 	"time"
 )
 
