@@ -12,7 +12,7 @@ func init() {
 	log = &logrus.Logger{
 		Formatter: new(logrus.TextFormatter),
 		Out:       os.Stdout,
-		Level:     logrus.DebugLevel,
+		Level:     logrus.WarnLevel,
 	}
 }
 
