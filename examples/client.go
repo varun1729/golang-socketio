@@ -5,8 +5,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mtfelian/golang-socketio"
-	"github.com/mtfelian/golang-socketio/transport"
+	"github.com/geneva-lake/golang-socketio"
+	"github.com/geneva-lake/golang-socketio/transport"
 )
 
 type Channel struct {

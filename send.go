@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/mtfelian/golang-socketio/protocol"
+	"github.com/geneva-lake/golang-socketio/protocol"
 )
 
 var (

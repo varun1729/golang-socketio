@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/geneva-lake/golang-socketio/logging"
 	"github.com/gorilla/websocket"
-	"github.com/mtfelian/golang-socketio/logging"
 )
 
 const (
