@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-	_ "time"
+	"time"
 
 	"github.com/mtfelian/golang-socketio/logging"
 	"github.com/mtfelian/golang-socketio/protocol"
 	"github.com/mtfelian/golang-socketio/transport"
-	"time"
 )
 
 const (
@@ -252,8 +251,6 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
-
-	//time.Sleep(1 * time.Second)
-
+	//time.Sleep(time.Second)
 	m.callLoopEvent(c, OnConnection)
 }

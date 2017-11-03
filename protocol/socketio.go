@@ -21,8 +21,8 @@ const (
 	ProbePingMessage = "2probe"
 	ProbePongMessage = "3probe"
 	UpgradeMessage   = "5"
-	StubMessage      = "stub"
 	BlankMessage     = "6"
+	StubMessage      = "stub"
 )
 
 var (
