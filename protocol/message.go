@@ -27,6 +27,9 @@ const (
 
 	// Upgrade message
 	MessageTypeUpgrade = iota
+
+	// Blank message
+	MessageTypeBlank = iota
 )
 
 type Message struct {

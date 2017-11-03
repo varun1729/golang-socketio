@@ -3,6 +3,8 @@ package gosocketio
 import (
 	"strconv"
 
+	_ "time"
+
 	"github.com/mtfelian/golang-socketio/transport"
 )
 
@@ -62,7 +64,11 @@ func Dial(url string, tr transport.Transport) (*Client, error) {
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
+
+		//time.Sleep(1 * time.Second)
+
 		//time.Sleep(time.Second)
+
 		go pollingClientListener(&c.Channel, &c.methods)
 	}
 

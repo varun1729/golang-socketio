@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-	"time"
+	_ "time"
 
 	"github.com/mtfelian/golang-socketio/logging"
 	"github.com/mtfelian/golang-socketio/protocol"
 	"github.com/mtfelian/golang-socketio/transport"
+	"time"
 )
 
 const (
@@ -163,7 +164,7 @@ func inLoop(c *Channel, m *methods) error {
 
 		msg, err := protocol.Decode(pkg)
 		if err != nil {
-			logging.Log().Debug("Decoding err: ", err)
+			logging.Log().Debug("Decoding err: ", err, " pkg: ", pkg)
 			CloseChannel(c, m)
 			return err
 		}
@@ -185,6 +186,7 @@ func inLoop(c *Channel, m *methods) error {
 				c.out <- protocol.PongMessage
 			}
 		case protocol.MessageTypeUpgrade:
+		case protocol.MessageTypeBlank:
 		case protocol.MessageTypePong:
 		default:
 			go m.processIncomingMessage(c, msg)
@@ -250,6 +252,8 @@ func pinger(c *Channel) {
 
 // Pauses for send http requests
 func pollingClientListener(c *Channel, m *methods) {
-	time.Sleep(time.Second)
+
+	//time.Sleep(1 * time.Second)
+
 	m.callLoopEvent(c, OnConnection)
 }

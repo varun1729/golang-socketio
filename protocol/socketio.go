@@ -22,6 +22,7 @@ const (
 	ProbePongMessage = "3probe"
 	UpgradeMessage   = "5"
 	StubMessage      = "stub"
+	BlankMessage     = "6"
 )
 
 var (
@@ -103,6 +104,8 @@ func getMessageType(data string) (int, error) {
 		return MessageTypePong, nil
 	case UpgradeMessage:
 		return MessageTypeUpgrade, nil
+	case BlankMessage:
+		return MessageTypeBlank, nil
 	case msg:
 		if len(data) == 1 {
 			return 0, ErrorWrongMessageType
@@ -193,7 +196,7 @@ func Decode(data string) (*Message, error) {
 	}
 
 	if msg.Type == MessageTypeClose || msg.Type == MessageTypePing ||
-		msg.Type == MessageTypePong || msg.Type == MessageTypeEmpty {
+		msg.Type == MessageTypePong || msg.Type == MessageTypeEmpty || msg.Type == MessageTypeBlank {
 		return msg, nil
 	}
 
