@@ -3,6 +3,8 @@ package gosocketio
 import (
 	"strconv"
 
+	_ "time"
+
 	"github.com/mtfelian/golang-socketio/transport"
 )
 

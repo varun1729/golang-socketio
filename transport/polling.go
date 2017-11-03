@@ -18,9 +18,8 @@ const (
 	PlDefaultPingTimeout    = 60 * time.Second
 	PlDefaultReceiveTimeout = 60 * time.Second
 	PlDefaultSendTimeout    = 60 * time.Second
-
-	StopMessage     = "stop"
-	UpgradedMessage = "upgrade"
+	StopMessage             = "stop"
+	UpgradedMessage         = "upgrade"
 )
 
 type PollingTransportParams struct {
@@ -128,7 +127,6 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	eventChan := make(chan string)
 	eventOutChan := make(chan string)
-
 	plc := &PollingConnection{
 		Transport: plt,
 		eventsIn:  eventChan,
