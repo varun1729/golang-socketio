@@ -125,16 +125,12 @@ func (plt *PollingTransport) Connect(url string) (Connection, error) {
 
 // Create new PollingConnection
 func (plt *PollingTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
-	eventChan := make(chan string)
-	eventOutChan := make(chan string)
-	plc := &PollingConnection{
+	return &PollingConnection{
 		Transport: plt,
-		eventsIn:  eventChan,
-		eventsOut: eventOutChan,
+		eventsIn:  make(chan string),
+		eventsOut: make(chan string),
 		errors:    make(chan string),
-	}
-
-	return plc, nil
+	}, nil
 }
 
 func (plt *PollingTransport) SetSid(sid string, conn Connection) {
@@ -146,11 +142,12 @@ func (plt *PollingTransport) SetSid(sid string, conn Connection) {
 func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	sessionId := r.URL.Query().Get("sid")
 	conn, exists := plt.sessions.Get(sessionId)
+	if !exists {
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
-		if !exists {
-			return
-		}
 		logging.Log().Debug("get method")
 		conn.PollingWriter(w, r)
 	case http.MethodPost:
