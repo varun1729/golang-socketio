@@ -3,15 +3,17 @@ golang socket.io
 
 This library was forked from github.com/graarh/golang-socketio
 
-golang implementation of [socket.io](http://socket.io) library, client and server
+golang implementation of [socket.io](http://socket.io) library, client and server via websocket and XHR polling transports. 
 
 Examples directory contains simple client and server.
 
 ### Installation
 
-    go get github.com/geneva-lake/golang-socketio
+    go get github.com/mtfelian/golang-socketio
 
-### Simple server usage
+### Usage (updating needed)
+
+#### Simple server usage 
 
 ```go
 	//create
@@ -42,7 +44,7 @@ Examples directory contains simple client and server.
 	log.Panic(http.ListenAndServe(":80", serveMux))
 ```
 
-### Javascript client for this server
+#### Javascript client for this server
 
 ```javascript
 var socket = io('ws://yourdomain.com', {transports: ['websocket']});
@@ -67,7 +69,7 @@ var socket = io('ws://yourdomain.com', {transports: ['websocket']});
     });
 ```
 
-### Server, detailed usage
+#### Server, detailed usage
 
 ```go
     //create server instance, you can setup transport parameters or get the default one
@@ -140,7 +142,7 @@ var socket = io('ws://yourdomain.com', {transports: ['websocket']});
 	log.Panic(http.ListenAndServe(":80", serveMux))
 ```
 
-### Client
+#### Client
 
 ```go
     //connect to server, you can use your own transport settings
