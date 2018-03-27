@@ -49,42 +49,38 @@ func typeToText(messageType int) (string, error) {
 }
 
 // Encode a socket.io message to the protocol format
-func Encode(m *Message) (string, error) {
-	result, err := typeToText(m.Type)
+func Encode(message *Message) (string, error) {
+	result, err := typeToText(message.Type)
 	if err != nil {
 		return "", err
 	}
 
-	if m.Type == MessageTypeEmpty || m.Type == MessageTypePing || m.Type == MessageTypePong {
+	switch message.Type {
+	case MessageTypeEmpty, MessageTypePing, MessageTypePong:
 		return result, nil
+	case MessageTypeAckRequest:
+		result += strconv.Itoa(message.AckId)
+	case MessageTypeAckResponse:
+		result += strconv.Itoa(message.AckId)
+		return result + "[" + message.Args + "]", nil
+	case MessageTypeOpen, MessageTypeClose:
+		return result + message.Args, nil
 	}
 
-	if m.Type == MessageTypeAckRequest || m.Type == MessageTypeAckResponse {
-		result += strconv.Itoa(m.AckId)
-	}
-
-	if m.Type == MessageTypeOpen || m.Type == MessageTypeClose {
-		return result + m.Args, nil
-	}
-
-	if m.Type == MessageTypeAckResponse {
-		return result + "[" + m.Args + "]", nil
-	}
-
-	jsonMethod, err := json.Marshal(&m.Event)
+	jsonMethod, err := json.Marshal(&message.Event)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(`%s[%s,%s]`, result, string(jsonMethod), m.Args), nil
+	return fmt.Sprintf(`%s[%s,%s]`, result, string(jsonMethod), message.Args), nil
 }
 
-func MustEncode(msg *Message) string {
-	result, err := Encode(msg)
+// MustEncode the message acts like Encode but panics on error
+func MustEncode(message *Message) string {
+	result, err := Encode(message)
 	if err != nil {
 		panic(err)
 	}
-
 	return result
 }
 
@@ -123,7 +119,7 @@ func getMessageType(data string) (int, error) {
 	return 0, ErrorWrongMessageType
 }
 
-// Get ack id of current packet, if present
+// getAck extracts an id of the current packet if present
 func getAck(text string) (ackId int, restText string, err error) {
 	if len(text) < 4 {
 		return 0, "", ErrorWrongPacket
@@ -143,8 +139,8 @@ func getAck(text string) (ackId int, restText string, err error) {
 	return ack, text[pos:], nil
 }
 
-// Get message method of current packet, if present
-func getMethod(text string) (method, restText string, err error) {
+// getMethod extracts a message event name of the current packet if present
+func getMethod(text string) (event, restText string, err error) {
 	var start, end, rest, countQuote int
 
 	for i, c := range text {
@@ -153,8 +149,7 @@ func getMethod(text string) (method, restText string, err error) {
 			case 0:
 				start = i + 1
 			case 1:
-				end = i
-				rest = i + 1
+				end, rest = i, i+1
 			default:
 				return "", "", ErrorWrongPacket
 			}
@@ -176,6 +171,7 @@ func getMethod(text string) (method, restText string, err error) {
 	return text[start:end], text[rest : len(text)-1], nil
 }
 
+// Decode the given data string into a Message
 func Decode(data string) (*Message, error) {
 	var err error
 	msg := &Message{Source: data}
@@ -185,17 +181,11 @@ func Decode(data string) (*Message, error) {
 		return nil, err
 	}
 
-	if msg.Type == MessageTypeUpgrade {
+	switch msg.Type {
+	case MessageTypeUpgrade, MessageTypeClose, MessageTypePing, MessageTypePong, MessageTypeEmpty, MessageTypeBlank:
 		return msg, nil
-	}
-
-	if msg.Type == MessageTypeOpen {
+	case MessageTypeOpen:
 		msg.Args = data[1:]
-		return msg, nil
-	}
-
-	if msg.Type == MessageTypeClose || msg.Type == MessageTypePing ||
-		msg.Type == MessageTypePong || msg.Type == MessageTypeEmpty || msg.Type == MessageTypeBlank {
 		return msg, nil
 	}
 
