@@ -85,13 +85,13 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 
 		logging.Log().Debug("processIncomingEvent() found method: ", f)
 
-		if !f.argsPresent {
+		if !f.argumentsPresent {
 			f.callFunc(c, &struct{}{})
 			return
 		}
 
-		data := f.getArgs()
-		logging.Log().Debug("processIncomingEvent(): f.getArgs() returned ", data)
+		data := f.getArguments()
+		logging.Log().Debug("processIncomingEvent(): f.getArguments() returned ", data)
 
 		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 			logging.Log().Infof("Error processing message. msg.Args: %s, data: %v, err: %v", msg.Args, data, err)
@@ -108,9 +108,9 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		}
 
 		var result []reflect.Value
-		if f.argsPresent {
+		if f.argumentsPresent {
 			// data type should be defined for Unmarshal()
-			data := f.getArgs()
+			data := f.getArguments()
 			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 				return
 			}

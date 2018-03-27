@@ -39,8 +39,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = c.On("/message", func(h *gosocketio.Channel, args Message) {
-		log.Println("--- Got chat message: ", args)
+	err = c.On("/message", func(h *gosocketio.Channel, payload Message) {
+		log.Println("--- Got chat message: ", payload)
 	})
 	if err != nil {
 		log.Fatal(err)
