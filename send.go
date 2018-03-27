@@ -24,12 +24,12 @@ func send(msg *protocol.Message, c *Channel, args interface{}) error {
 	}()
 
 	if args != nil {
-		json, err := json.Marshal(&args)
+		b, err := json.Marshal(&args)
 		if err != nil {
 			return err
 		}
 
-		msg.Args = string(json)
+		msg.Args = string(b)
 	}
 
 	command, err := protocol.Encode(msg)
@@ -49,8 +49,8 @@ func send(msg *protocol.Message, c *Channel, args interface{}) error {
 // Create packet based on given data and send it
 func (c *Channel) Emit(method string, args interface{}) error {
 	msg := &protocol.Message{
-		Type:   protocol.MessageTypeEmit,
-		Method: method,
+		Type:  protocol.MessageTypeEmit,
+		Event: method,
 	}
 
 	return send(msg, c, args)
@@ -59,9 +59,9 @@ func (c *Channel) Emit(method string, args interface{}) error {
 // Create ack packet based on given data and send it and receive response
 func (c *Channel) Ack(method string, args interface{}, timeout time.Duration) (string, error) {
 	msg := &protocol.Message{
-		Type:   protocol.MessageTypeAckRequest,
-		AckId:  c.ack.getNextId(),
-		Method: method,
+		Type:  protocol.MessageTypeAckRequest,
+		AckId: c.ack.getNextId(),
+		Event: method,
 	}
 
 	waiter := make(chan string)

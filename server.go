@@ -408,7 +408,7 @@ func NewServer() *Server {
 		sids:      make(map[string]*Channel),
 	}
 
-	s.initMethods()
+	s.initEvents()
 	s.onConnection = onConnectStore
 	s.onDisconnection = onDisconnectCleanup
 

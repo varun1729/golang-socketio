@@ -104,7 +104,7 @@ func CloseChannel(c *Channel, m *methods) error {
 		<-c.out
 	}
 
-	c.out <- protocol.CloseMessage
+	c.out <- protocol.MessageClose
 	m.callLoopEvent(c, OnDisconnection)
 
 	overfloodedLock.Lock()
@@ -138,7 +138,7 @@ func StubChannel(c *Channel) error {
 		<-c.out
 	}
 
-	c.out <- protocol.StubMessage
+	c.out <- protocol.MessageStub
 
 	overfloodedLock.Lock()
 	delete(overflooded, c)
@@ -177,25 +177,25 @@ func inLoop(c *Channel, m *methods) error {
 			m.callLoopEvent(c, OnConnection)
 		case protocol.MessageTypePing:
 			logging.Log().Debug("get MessageTypePing ", msg, " source ", msg.Source)
-			if msg.Source == protocol.ProbePingMessage {
+			if msg.Source == protocol.MessagePingProbe {
 				logging.Log().Debug("get 2probe")
-				c.out <- protocol.ProbePongMessage
+				c.out <- protocol.MessagePongProbe
 				c.upgraded <- transport.UpgradedMessage
 			} else {
-				c.out <- protocol.PongMessage
+				c.out <- protocol.MessagePong
 			}
 		case protocol.MessageTypeUpgrade:
 		case protocol.MessageTypeBlank:
 		case protocol.MessageTypePong:
 		default:
-			go m.processIncomingMessage(c, msg)
+			go m.processIncomingEvent(c, msg)
 		}
 	}
 
 	return nil
 }
 
-var overflooded map[*Channel]struct{} = make(map[*Channel]struct{})
+var overflooded = make(map[*Channel]struct{})
 var overfloodedLock sync.Mutex
 
 func AmountOfOverflooded() int64 {
@@ -225,7 +225,7 @@ func outLoop(c *Channel, m *methods) error {
 
 		msg := <-c.out
 
-		if msg == protocol.CloseMessage || msg == protocol.StubMessage {
+		if msg == protocol.MessageClose || msg == protocol.MessageStub {
 			return nil
 		}
 
@@ -245,7 +245,7 @@ func pinger(c *Channel) {
 			return
 		}
 
-		c.out <- protocol.PingMessage
+		c.out <- protocol.MessagePing
 	}
 }
 

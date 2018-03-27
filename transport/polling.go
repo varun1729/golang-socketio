@@ -43,7 +43,7 @@ func (plc *PollingConnection) GetMessage() (string, error) {
 		return "", errors.New("Receive time out")
 	case msg := <-plc.eventsIn:
 		logging.Log().Debug("GetMessage: ", msg)
-		if msg == protocol.CloseMessage {
+		if msg == protocol.MessageClose {
 			logging.Log().Debug("send message 1 to eventsOut")
 			return "", errors.New("Close connection")
 		}

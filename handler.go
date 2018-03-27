@@ -16,58 +16,55 @@ const (
 	OnError         = "error"
 )
 
-// System handler function for internal event processing
-type systemHandler func(c *Channel)
+// systemEventHandler function for internal event processing
+type systemEventHandler func(c *Channel)
 
-// Contains maps of message processing functions
+// methods abstracts a mapping of a event names to handler functions
 type methods struct {
-	messageHandlers     map[string]*caller
-	messageHandlersLock sync.RWMutex
+	eventHandlers     map[string]*handler // event name -> handler function representation
+	eventHandlersLock sync.RWMutex
 
-	onConnection    systemHandler
-	onDisconnection systemHandler
+	onConnection    systemEventHandler
+	onDisconnection systemEventHandler
 }
 
-// create messageHandlers map
-func (m *methods) initMethods() {
-	m.messageHandlers = make(map[string]*caller)
-}
+// initEvents initializes events mapping
+func (m *methods) initEvents() { m.eventHandlers = make(map[string]*handler) }
 
-// Add message processing function, and bind it to given method
-func (m *methods) On(method string, f interface{}) error {
-	c, err := newCaller(f)
+// On registers message processing function and binds it to the given event name
+func (m *methods) On(name string, f interface{}) error {
+	c, err := newHandler(f)
 	if err != nil {
 		return err
 	}
 
-	m.messageHandlersLock.Lock()
-	defer m.messageHandlersLock.Unlock()
-	m.messageHandlers[method] = c
+	m.eventHandlersLock.Lock()
+	m.eventHandlers[name] = c
+	m.eventHandlersLock.Unlock()
 
 	return nil
 }
 
-// Find message processing function associated with given method
-func (m *methods) findMethod(method string) (*caller, bool) {
-	m.messageHandlersLock.RLock()
-	defer m.messageHandlersLock.RUnlock()
-
-	f, ok := m.messageHandlers[method]
+// findEvent returns a handler representation for the given event name
+func (m *methods) findEvent(name string) (*handler, bool) {
+	m.eventHandlersLock.RLock()
+	f, ok := m.eventHandlers[name]
+	m.eventHandlersLock.RUnlock()
 	return f, ok
 }
 
 func (m *methods) callLoopEvent(c *Channel, event string) {
 	if m.onConnection != nil && event == OnConnection {
-		logging.Log().Debug("OnConnection callloopevent")
+		logging.Log().Debug("callLoopEvent(): OnConnection event")
 		m.onConnection(c)
 	}
 	if m.onDisconnection != nil && event == OnDisconnection {
 		m.onDisconnection(c)
 	}
 
-	f, ok := m.findMethod(event)
+	f, ok := m.findEvent(event)
 	if !ok {
-		logging.Log().Debug("not found method")
+		logging.Log().Debug("callLoopEvent(): event not found")
 		return
 	}
 
@@ -78,20 +75,20 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 // On ack_resp - look for waiter
 // On ack_req - look for processing function and send ack_resp
 // On emit - look for processing function
-func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
-	logging.Log().Debug("processIncomingMessage ", msg)
+func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
+	logging.Log().Debug("processIncomingEvent():", msg)
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
-		logging.Log().Debug("finding method ", msg.Method)
-		f, ok := m.findMethod(msg.Method)
+		logging.Log().Debug("processIncomingEvent() is finding event:", msg.Event)
+		f, ok := m.findEvent(msg.Event)
 		if !ok {
-			logging.Log().Debug("not found method")
+			logging.Log().Debug("processIncomingEvent(): event not found")
 			return
 		}
 
-		logging.Log().Debug("found method ", f)
+		logging.Log().Debug("processIncomingEvent() found method:", f)
 
-		if !f.ArgsPresent {
+		if !f.argsPresent {
 			f.callFunc(c, &struct{}{})
 			return
 		}
@@ -107,14 +104,14 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		f.callFunc(c, data)
 
 	case protocol.MessageTypeAckRequest:
-		logging.Log().Debug("ack request")
-		f, ok := m.findMethod(msg.Method)
-		if !ok || !f.Out {
+		logging.Log().Debug("processIncomingEvent(): ack request")
+		f, ok := m.findEvent(msg.Event)
+		if !ok || !f.out {
 			return
 		}
 
 		var result []reflect.Value
-		if f.ArgsPresent {
+		if f.argsPresent {
 			// data type should be defined for Unmarshal()
 			data := f.getArgs()
 			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
@@ -133,7 +130,7 @@ func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
 		send(ack, c, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
-		logging.Log().Debug("ack response")
+		logging.Log().Debug("processIncomingEvent(): ack response")
 		waiter, err := c.ack.getWaiter(msg.AckId)
 		if err == nil {
 			waiter <- msg.Args

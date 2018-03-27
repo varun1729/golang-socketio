@@ -78,7 +78,7 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 }
 
 func (plc *PollingClientConnection) Close() {
-	plc.WriteMessage(protocol.CloseMessage)
+	plc.WriteMessage(protocol.MessageClose)
 }
 
 func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
@@ -127,7 +127,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 
 	index := strings.Index(bodyString, ":")
 	body := bodyString[index+1:]
-	if string(body[0]) == protocol.OpenMessage {
+	if string(body[0]) == protocol.MessageOpen {
 		bodyBytes2 := []byte(body[1:])
 		var openSequence OpenSequence
 
@@ -160,7 +160,7 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	index = strings.Index(bodyString, ":")
 	body = bodyString[index+1:]
 
-	if body == protocol.EmptyMessage {
+	if body == protocol.MessageEmpty {
 		return plc, nil
 	}
 

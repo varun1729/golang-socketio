@@ -3,81 +3,80 @@ package protocol
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
 
 const (
-	OpenMessage        = "0"
-	msg                = "4"
-	EmptyMessage       = "40"
-	closeClientMessage = "41"
-	commonMessage      = "42"
-	ackMessage         = "43"
-
-	CloseMessage     = "1"
-	PingMessage      = "2"
-	PongMessage      = "3"
-	ProbePingMessage = "2probe"
-	ProbePongMessage = "3probe"
-	UpgradeMessage   = "5"
-	BlankMessage     = "6"
-	StubMessage      = "stub"
+	MessageOpen        = "0"
+	MessageClose       = "1"
+	MessagePing        = "2"
+	MessagePingProbe   = "2probe"
+	MessagePongProbe   = "3probe"
+	MessagePong        = "3"
+	messageMSG         = "4"
+	MessageEmpty       = "40"
+	messageCloseClient = "41"
+	messageCommon      = "42"
+	messageACK         = "43"
+	MessageUpgrade     = "5"
+	MessageBlank       = "6"
+	MessageStub        = "stub"
 )
 
 var (
-	ErrorWrongMessageType = errors.New("Wrong message type")
-	ErrorWrongPacket      = errors.New("Wrong packet")
+	ErrorWrongMessageType = errors.New("wrong message type")
+	ErrorWrongPacket      = errors.New("wrong packet")
 )
 
-func typeToText(msgType int) (string, error) {
-	switch msgType {
-	case MessageTypeOpen:
-		return OpenMessage, nil
-	case MessageTypeClose:
-		return CloseMessage, nil
-	case MessageTypePing:
-		return PingMessage, nil
-	case MessageTypePong:
-		return PongMessage, nil
-	case MessageTypeEmpty:
-		return EmptyMessage, nil
-	case MessageTypeEmit, MessageTypeAckRequest:
-		return commonMessage, nil
-	case MessageTypeAckResponse:
-		return ackMessage, nil
+func typeToText(messageType int) (string, error) {
+	m := map[int]string{
+		MessageTypeOpen:        MessageOpen,
+		MessageTypeClose:       MessageClose,
+		MessageTypePing:        MessagePing,
+		MessageTypePong:        MessagePong,
+		MessageTypeEmpty:       MessageEmpty,
+		MessageTypeEmit:        messageCommon,
+		MessageTypeAckRequest:  messageCommon,
+		MessageTypeAckResponse: messageACK,
 	}
-	return "", ErrorWrongMessageType
+	msg, exists := m[messageType]
+	if !exists {
+		return "", ErrorWrongMessageType
+	}
+	return msg, nil
 }
 
-func Encode(msg *Message) (string, error) {
-	result, err := typeToText(msg.Type)
+// Encode a socket.io message to the protocol format
+func Encode(m *Message) (string, error) {
+	result, err := typeToText(m.Type)
 	if err != nil {
 		return "", err
 	}
 
-	if msg.Type == MessageTypeEmpty || msg.Type == MessageTypePing || msg.Type == MessageTypePong {
+	if m.Type == MessageTypeEmpty || m.Type == MessageTypePing || m.Type == MessageTypePong {
 		return result, nil
 	}
 
-	if msg.Type == MessageTypeAckRequest || msg.Type == MessageTypeAckResponse {
-		result += strconv.Itoa(msg.AckId)
+	if m.Type == MessageTypeAckRequest || m.Type == MessageTypeAckResponse {
+		result += strconv.Itoa(m.AckId)
 	}
 
-	if msg.Type == MessageTypeOpen || msg.Type == MessageTypeClose {
-		return result + msg.Args, nil
+	if m.Type == MessageTypeOpen || m.Type == MessageTypeClose {
+		return result + m.Args, nil
 	}
 
-	if msg.Type == MessageTypeAckResponse {
-		return result + "[" + msg.Args + "]", nil
+	if m.Type == MessageTypeAckResponse {
+		return result + "[" + m.Args + "]", nil
 	}
 
-	jsonMethod, err := json.Marshal(&msg.Method)
+	jsonMethod, err := json.Marshal(&m.Event)
 	if err != nil {
 		return "", err
 	}
 
-	return result + "[" + string(jsonMethod) + "," + msg.Args + "]", nil
+	return fmt.Sprintf(`%s[%s,%s]`, result, string(jsonMethod), m.Args), nil
 }
 
 func MustEncode(msg *Message) string {
@@ -94,30 +93,30 @@ func getMessageType(data string) (int, error) {
 		return 0, ErrorWrongMessageType
 	}
 	switch data[0:1] {
-	case OpenMessage:
+	case MessageOpen:
 		return MessageTypeOpen, nil
-	case CloseMessage:
+	case MessageClose:
 		return MessageTypeClose, nil
-	case PingMessage:
+	case MessagePing:
 		return MessageTypePing, nil
-	case PongMessage:
+	case MessagePong:
 		return MessageTypePong, nil
-	case UpgradeMessage:
+	case MessageUpgrade:
 		return MessageTypeUpgrade, nil
-	case BlankMessage:
+	case MessageBlank:
 		return MessageTypeBlank, nil
-	case msg:
+	case messageMSG:
 		if len(data) == 1 {
 			return 0, ErrorWrongMessageType
 		}
 		switch data[0:2] {
-		case EmptyMessage:
+		case MessageEmpty:
 			return MessageTypeEmpty, nil
-		case closeClientMessage:
+		case messageCloseClient:
 			return MessageTypeClose, nil
-		case commonMessage:
+		case messageCommon:
 			return MessageTypeAckRequest, nil
-		case ackMessage:
+		case messageACK:
 			return MessageTypeAckResponse, nil
 		}
 	}
@@ -215,7 +214,7 @@ func Decode(data string) (*Message, error) {
 		rest = data[2:]
 	}
 
-	msg.Method, msg.Args, err = getMethod(rest)
+	msg.Event, msg.Args, err = getMethod(rest)
 	if err != nil {
 		return nil, err
 	}
