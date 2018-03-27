@@ -108,48 +108,50 @@ func closeChannel(c *Channel, m *methods) error {
 	return nil
 }
 
-//incoming messages loop, puts incoming messages to In channel
-func inLoop(c *Channel, m *methods) error {
+// inLoop is an incoming messages loop
+func (c *Channel) inLoop(m *methods) error {
 	for {
-		pkg, err := c.conn.GetMessage()
+		message, err := c.conn.GetMessage()
 		if err != nil {
-			logging.Log().Debug("c.conn.GetMessage err ", err, " pkg: ", pkg)
+			logging.Log().Debugf("inLoop(), c.conn.GetMessage() err: %v, message: %s", err, message)
 			return closeChannel(c, m)
 		}
 
-		if pkg == transport.StopMessage {
-			logging.Log().Debug("inLoop StopMessage")
+		if message == transport.StopMessage {
+			logging.Log().Debug("inLoop(): StopMessage")
 			return nil
 		}
 
-		msg, err := protocol.Decode(pkg)
+		decodedMessage, err := protocol.Decode(message)
 		if err != nil {
-			logging.Log().Debug("Decoding err: ", err, " pkg: ", pkg)
+			logging.Log().Debugf("inLoop() decoding err: %v, message: %s", err, message)
 			closeChannel(c, m)
 			return err
 		}
 
-		switch msg.Type {
+		switch decodedMessage.Type {
 		case protocol.MessageTypeOpen:
-			logging.Log().Debug("protocol.MessageTypeOpen: ", msg)
-			if err := json.Unmarshal([]byte(msg.Source[1:]), &c.header); err != nil {
+			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen: %+v", decodedMessage)
+			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.header); err != nil {
 				closeChannel(c, m)
 			}
 			m.callLoopEvent(c, OnConnection)
+
 		case protocol.MessageTypePing:
-			logging.Log().Debug("get MessageTypePing ", msg, " source ", msg.Source)
-			if msg.Source == protocol.MessagePingProbe {
-				logging.Log().Debug("get 2probe")
+			logging.Log().Debugf("inLoop(), protocol.MessageTypePing: %+v", decodedMessage)
+			if decodedMessage.Source == protocol.MessagePingProbe {
+				logging.Log().Debugf("inLoop(), got %s", decodedMessage.Source)
 				c.out <- protocol.MessagePongProbe
 				c.upgraded <- transport.UpgradedMessage
 			} else {
 				c.out <- protocol.MessagePong
 			}
+
 		case protocol.MessageTypeUpgrade:
 		case protocol.MessageTypeBlank:
 		case protocol.MessageTypePong:
 		default:
-			go m.processIncomingEvent(c, msg)
+			go m.processIncomingEvent(c, decodedMessage)
 		}
 	}
 
@@ -159,26 +161,27 @@ func inLoop(c *Channel, m *methods) error {
 var overflooded = make(map[*Channel]struct{})
 var overfloodedLock sync.Mutex
 
-func AmountOfOverflooded() int64 {
+// OverfloodedChannelsCount returns an amount of overflooding channels
+func OverfloodedChannelsCount() int64 {
 	overfloodedLock.Lock()
 	defer overfloodedLock.Unlock()
-
 	return int64(len(overflooded))
 }
 
-// outgoing messages loop, sends messages from channel to socket
-func outLoop(c *Channel, m *methods) error {
+// outLoop is an outgoing messages loop, sends messages from channel to socket
+func (c *Channel) outLoop(m *methods) error {
 	for {
 		outBufferLen := len(c.out)
-		logging.Log().Debug("outBufferLen: ", outBufferLen)
-		if outBufferLen >= queueBufferSize-1 {
-			logging.Log().Debug("outBufferLen >= queueBufferSize-1")
+		logging.Log().Debug("outLoop(), outBufferLen: ", outBufferLen)
+		switch {
+		case outBufferLen >= queueBufferSize-1:
+			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
 			return closeChannel(c, m)
-		} else if outBufferLen > int(queueBufferSize/2) {
+		case outBufferLen > int(queueBufferSize/2):
 			overfloodedLock.Lock()
 			overflooded[c] = struct{}{}
 			overfloodedLock.Unlock()
-		} else {
+		default:
 			overfloodedLock.Lock()
 			delete(overflooded, c)
 			overfloodedLock.Unlock()
@@ -191,14 +194,15 @@ func outLoop(c *Channel, m *methods) error {
 		}
 
 		if err := c.conn.WriteMessage(msg); err != nil {
+			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage(), err: ", err)
 			return closeChannel(c, m)
 		}
 	}
 	return nil
 }
 
-// Pinger sends ping messages for keeping connection alive
-func pinger(c *Channel) {
+// pingLoop sends ping messages for keeping connection alive
+func (c *Channel) pingLoop() {
 	for {
 		interval, _ := c.conn.PingParams()
 		time.Sleep(interval)
@@ -208,10 +212,4 @@ func pinger(c *Channel) {
 
 		c.out <- protocol.MessagePing
 	}
-}
-
-// Pauses for send http requests
-func pollingClientListener(c *Channel, m *methods) {
-	//time.Sleep(time.Second)
-	m.callLoopEvent(c, OnConnection)
 }

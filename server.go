@@ -291,8 +291,8 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string, re
 
 	s.SendOpenSequence(c)
 
-	go inLoop(c, &s.methods)
-	go outLoop(c, &s.methods)
+	go c.inLoop(&s.methods)
+	go c.outLoop(&s.methods)
 
 	s.callLoopEvent(c, OnConnection)
 }
@@ -326,8 +326,8 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 	c.initChannel()
 	logging.Log().Debug("SetupUpgradeEventLoop init channel")
 
-	go inLoop(c, &s.methods)
-	go outLoop(c, &s.methods)
+	go c.inLoop(&s.methods)
+	go c.outLoop(&s.methods)
 
 	logging.Log().Debug("SetupUpgradeEventLoop go loops")
 	onConnectStore(c)

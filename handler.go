@@ -2,7 +2,6 @@ package gosocketio
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -58,6 +57,7 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 		logging.Log().Debug("callLoopEvent(): OnConnection event")
 		m.onConnection(c)
 	}
+
 	if m.onDisconnection != nil && event == OnDisconnection {
 		m.onDisconnection(c)
 	}
@@ -73,17 +73,17 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 
 // processIncomingEvent checks incoming message
 func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
-	logging.Log().Debug("processIncomingEvent():", msg)
+	logging.Log().Debug("processIncomingEvent(): ", msg)
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
-		logging.Log().Debug("processIncomingEvent() is finding event:", msg.Event)
+		logging.Log().Debug("processIncomingEvent() is finding event: ", msg.Event)
 		f, ok := m.findEvent(msg.Event)
 		if !ok {
 			logging.Log().Debug("processIncomingEvent(): event not found")
 			return
 		}
 
-		logging.Log().Debug("processIncomingEvent() found method:", f)
+		logging.Log().Debug("processIncomingEvent() found method: ", f)
 
 		if !f.argsPresent {
 			f.callFunc(c, &struct{}{})
@@ -91,10 +91,10 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		}
 
 		data := f.getArgs()
-		logging.Log().Debug("f.getArgs ", data)
+		logging.Log().Debug("processIncomingEvent(): f.getArgs() returned ", data)
 
 		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
-			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
+			logging.Log().Infof("Error processing message. msg.Args: %s, data: %v, err: %v", msg.Args, data, err)
 			return
 		}
 

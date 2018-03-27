@@ -57,13 +57,13 @@ func Dial(url string, tr transport.Transport) (*Client, error) {
 		return nil, err
 	}
 
-	go inLoop(&c.Channel, &c.methods)
-	go outLoop(&c.Channel, &c.methods)
-	go pinger(&c.Channel)
+	go (&c.Channel).inLoop(&c.methods)
+	go (&c.Channel).outLoop(&c.methods)
+	go (&c.Channel).pingLoop()
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
-		go pollingClientListener(&c.Channel, &c.methods)
+		go (&c.methods).callLoopEvent(&c.Channel, OnConnection)
 	}
 
 	return c, nil
