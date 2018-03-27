@@ -20,8 +20,8 @@ type systemEventHandler func(c *Channel)
 
 // methods abstracts a mapping of a event names to handler functions
 type methods struct {
-	eventHandlers     map[string]*handler // event name -> handler function representation
-	eventHandlersLock sync.RWMutex
+	eventHandlers      map[string]*handler // maps event name to handler function representation
+	eventHandlersMutex sync.RWMutex
 
 	onConnection    systemEventHandler
 	onDisconnection systemEventHandler
@@ -37,18 +37,18 @@ func (m *methods) On(name string, f interface{}) error {
 		return err
 	}
 
-	m.eventHandlersLock.Lock()
+	m.eventHandlersMutex.Lock()
 	m.eventHandlers[name] = c
-	m.eventHandlersLock.Unlock()
+	m.eventHandlersMutex.Unlock()
 
 	return nil
 }
 
 // findEvent returns a handler representation for the given event name
 func (m *methods) findEvent(name string) (*handler, bool) {
-	m.eventHandlersLock.RLock()
+	m.eventHandlersMutex.RLock()
 	f, ok := m.eventHandlers[name]
-	m.eventHandlersLock.RUnlock()
+	m.eventHandlersMutex.RUnlock()
 	return f, ok
 }
 

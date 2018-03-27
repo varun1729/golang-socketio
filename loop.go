@@ -37,8 +37,8 @@ type Channel struct {
 	upgraded chan string
 	header   header
 
-	alive     bool
-	aliveLock sync.Mutex
+	alive      bool
+	aliveMutex sync.Mutex
 
 	ack ackProcessor
 
@@ -59,8 +59,8 @@ func (c *Channel) Id() string { return c.header.Sid }
 
 // IsAlive checks that Channel is still alive
 func (c *Channel) IsAlive() bool {
-	c.aliveLock.Lock()
-	defer c.aliveLock.Unlock()
+	c.aliveMutex.Lock()
+	defer c.aliveMutex.Unlock()
 	return c.alive
 }
 
@@ -79,8 +79,8 @@ func closeChannel(c *Channel, m *methods) error {
 		logging.Log().Debug("closeChannel() type: WebsocketConnection")
 	}
 
-	c.aliveLock.Lock()
-	defer c.aliveLock.Unlock()
+	c.aliveMutex.Lock()
+	defer c.aliveMutex.Unlock()
 
 	if !c.alive { // already closed
 		return nil
@@ -101,9 +101,9 @@ func closeChannel(c *Channel, m *methods) error {
 		c.out <- protocol.MessageStub
 	}
 
-	overfloodedLock.Lock()
+	overfloodedMutex.Lock()
 	delete(overflooded, c)
-	overfloodedLock.Unlock()
+	overfloodedMutex.Unlock()
 
 	return nil
 }
@@ -159,12 +159,12 @@ func (c *Channel) inLoop(m *methods) error {
 }
 
 var overflooded = make(map[*Channel]struct{})
-var overfloodedLock sync.Mutex
+var overfloodedMutex sync.Mutex
 
 // OverfloodedChannelsCount returns an amount of overflooding channels
 func OverfloodedChannelsCount() int64 {
-	overfloodedLock.Lock()
-	defer overfloodedLock.Unlock()
+	overfloodedMutex.Lock()
+	defer overfloodedMutex.Unlock()
 	return int64(len(overflooded))
 }
 
@@ -178,13 +178,13 @@ func (c *Channel) outLoop(m *methods) error {
 			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
 			return closeChannel(c, m)
 		case outBufferLen > int(queueBufferSize/2):
-			overfloodedLock.Lock()
+			overfloodedMutex.Lock()
 			overflooded[c] = struct{}{}
-			overfloodedLock.Unlock()
+			overfloodedMutex.Unlock()
 		default:
-			overfloodedLock.Lock()
+			overfloodedMutex.Lock()
 			delete(overflooded, c)
-			overfloodedLock.Unlock()
+			overfloodedMutex.Unlock()
 		}
 
 		msg := <-c.out

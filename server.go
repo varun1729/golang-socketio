@@ -15,7 +15,6 @@ import (
 	"github.com/mtfelian/golang-socketio/logging"
 	"github.com/mtfelian/golang-socketio/protocol"
 	"github.com/mtfelian/golang-socketio/transport"
-	"log"
 )
 
 const (
@@ -23,28 +22,27 @@ const (
 )
 
 var (
-	ErrorServerNotSet       = errors.New("Server not set")
-	ErrorConnectionNotFound = errors.New("Connection not found")
+	ErrorServerNotSet       = errors.New("server was not set")
+	ErrorConnectionNotFound = errors.New("connection not found")
 )
 
-// socket.io server instance
+// Server represents a socket.io server instance
 type Server struct {
 	methods
 	http.Handler
 
-	channels     map[string]map[*Channel]struct{}
-	rooms        map[*Channel]map[string]struct{}
-	channelsLock sync.RWMutex
+	channels      map[string]map[*Channel]struct{} // maps room name to map of channels to an empty struct
+	rooms         map[*Channel]map[string]struct{} // maps channel to map of room names to an empty struct
+	channelsMutex sync.RWMutex
 
-	sids     map[string]*Channel
-	sidsLock sync.RWMutex
+	sids      map[string]*Channel // maps channel id to channel
+	sidsMutex sync.RWMutex
 
-	//tr transport.Transport
 	websocket *transport.WebsocketTransport
 	polling   *transport.PollingTransport
 }
 
-// Get ip of socket client
+// Ip returns an IP of the socket client
 func (c *Channel) Ip() string {
 	forward := c.RequestHeader().Get(HeaderForward)
 	if forward != "" {
@@ -53,15 +51,13 @@ func (c *Channel) Ip() string {
 	return c.ip
 }
 
-// Get request header of this connection
-func (c *Channel) RequestHeader() http.Header {
-	return c.requestHeader
-}
+// RequestHeader returns a connection request header
+func (c *Channel) RequestHeader() http.Header { return c.requestHeader }
 
-// Get channel by it's sid
+// GetChannel by it's sid
 func (s *Server) GetChannel(sid string) (*Channel, error) {
-	s.sidsLock.RLock()
-	defer s.sidsLock.RUnlock()
+	s.sidsMutex.RLock()
+	defer s.sidsMutex.RUnlock()
 
 	c, ok := s.sids[sid]
 	if !ok {
@@ -71,57 +67,51 @@ func (s *Server) GetChannel(sid string) (*Channel, error) {
 	return c, nil
 }
 
-// Join this channel to given room
+// Join this channel to the given room
 func (c *Channel) Join(room string) error {
 	if c.server == nil {
 		return ErrorServerNotSet
 	}
 
-	c.server.channelsLock.Lock()
-	defer c.server.channelsLock.Unlock()
+	c.server.channelsMutex.Lock()
+	defer c.server.channelsMutex.Unlock()
 
-	cn := c.server.channels
-	if _, ok := cn[room]; !ok {
-		cn[room] = make(map[*Channel]struct{})
+	if _, ok := c.server.channels[room]; !ok {
+		c.server.channels[room] = make(map[*Channel]struct{})
 	}
 
-	byRoom := c.server.rooms
-	if _, ok := byRoom[c]; !ok {
-		byRoom[c] = make(map[string]struct{})
+	if _, ok := c.server.rooms[c]; !ok {
+		c.server.rooms[c] = make(map[string]struct{})
 	}
 
-	cn[room][c] = struct{}{}
-	byRoom[c][room] = struct{}{}
-
+	c.server.channels[room][c], c.server.rooms[c][room] = struct{}{}, struct{}{}
 	return nil
 }
 
-// Remove this channel from given room
+// Leave the given room (remove channel from it)
 func (c *Channel) Leave(room string) error {
 	if c.server == nil {
 		return ErrorServerNotSet
 	}
 
-	c.server.channelsLock.Lock()
-	defer c.server.channelsLock.Unlock()
+	c.server.channelsMutex.Lock()
+	defer c.server.channelsMutex.Unlock()
 
-	cn := c.server.channels
-	if _, ok := cn[room]; ok {
-		delete(cn[room], c)
-		if len(cn[room]) == 0 {
-			delete(cn, room)
+	if _, ok := c.server.channels[room]; ok {
+		delete(c.server.channels[room], c)
+		if len(c.server.channels[room]) == 0 {
+			delete(c.server.channels, room)
 		}
 	}
 
-	byRoom := c.server.rooms
-	if _, ok := byRoom[c]; ok {
-		delete(byRoom[c], room)
+	if _, ok := c.server.rooms[c]; ok {
+		delete(c.server.rooms[c], room)
 	}
 
 	return nil
 }
 
-// Get amount of channels, joined to given room, using channel
+// Amount returns an amount of channels joined to the given room
 func (c *Channel) Amount(room string) int {
 	if c.server == nil {
 		return 0
@@ -132,8 +122,8 @@ func (c *Channel) Amount(room string) int {
 
 // Get amount of channels, joined to given room, using server
 func (s *Server) Amount(room string) int {
-	s.channelsLock.RLock()
-	defer s.channelsLock.RUnlock()
+	s.channelsMutex.RLock()
+	defer s.channelsMutex.RUnlock()
 
 	roomChannels, _ := s.channels[room]
 	return len(roomChannels)
@@ -150,8 +140,8 @@ func (c *Channel) List(room string) []*Channel {
 
 // Get list of channels, joined to given room, using server
 func (s *Server) List(room string) []*Channel {
-	s.channelsLock.RLock()
-	defer s.channelsLock.RUnlock()
+	s.channelsMutex.RLock()
+	defer s.channelsMutex.RUnlock()
 
 	roomChannels, ok := s.channels[room]
 	if !ok {
@@ -178,8 +168,8 @@ func (c *Channel) BroadcastTo(room, method string, payload interface{}) {
 
 // Broadcast message to all room channels
 func (s *Server) BroadcastTo(room, method string, payload interface{}) {
-	s.channelsLock.RLock()
-	defer s.channelsLock.RUnlock()
+	s.channelsMutex.RLock()
+	defer s.channelsMutex.RUnlock()
 
 	roomChannels, ok := s.channels[room]
 	if !ok {
@@ -195,8 +185,8 @@ func (s *Server) BroadcastTo(room, method string, payload interface{}) {
 
 // Broadcast to all clients
 func (s *Server) BroadcastToAll(method string, payload interface{}) {
-	s.sidsLock.RLock()
-	defer s.sidsLock.RUnlock()
+	s.sidsMutex.RLock()
+	defer s.sidsMutex.RUnlock()
 
 	for _, cn := range s.sids {
 		if cn.IsAlive() {
@@ -218,25 +208,23 @@ func generateNewId(custom string) string {
 
 // On connection system handler, store sid
 func onConnectStore(c *Channel) {
-	c.server.sidsLock.Lock()
-	defer c.server.sidsLock.Unlock()
-
+	c.server.sidsMutex.Lock()
+	defer c.server.sidsMutex.Unlock()
 	c.server.sids[c.Id()] = c
 }
 
 // On disconnection system handler, clean joins and sid
 func onDisconnectCleanup(c *Channel) {
-	c.server.channelsLock.Lock()
-	defer c.server.channelsLock.Unlock()
+	c.server.channelsMutex.Lock()
+	defer c.server.channelsMutex.Unlock()
 
-	cn := c.server.channels
 	byRoom, ok := c.server.rooms[c]
 	if ok {
 		for room := range byRoom {
-			if curRoom, ok := cn[room]; ok {
+			if curRoom, ok := c.server.channels[room]; ok {
 				delete(curRoom, c)
 				if len(curRoom) == 0 {
-					delete(cn, room)
+					delete(c.server.channels, room)
 				}
 			}
 		}
@@ -244,8 +232,8 @@ func onDisconnectCleanup(c *Channel) {
 		delete(c.server.rooms, c)
 	}
 
-	c.server.sidsLock.Lock()
-	defer c.server.sidsLock.Unlock()
+	c.server.sidsMutex.Lock()
+	defer c.server.sidsMutex.Unlock()
 
 	delete(c.server.sids, c.Id())
 }
@@ -255,12 +243,7 @@ func (s *Server) SendOpenSequence(c *Channel) {
 	if err != nil {
 		panic(err)
 	}
-	c.out <- protocol.MustEncode(
-		&protocol.Message{
-			Type: protocol.MessageTypeOpen,
-			Args: string(jsonHdr),
-		},
-	)
+	c.out <- protocol.MustEncode(&protocol.Message{Type: protocol.MessageTypeOpen, Args: string(jsonHdr)})
 	c.out <- protocol.MustEncode(&protocol.Message{Type: protocol.MessageTypeEmpty})
 }
 
@@ -303,7 +286,7 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 
 	cp, err := s.GetChannel(sid)
 	if err != nil {
-		log.Println("can't find channel for session: ", sid)
+		logging.Log().Warnf("can't find channel for session: ", sid)
 		return
 	}
 
@@ -384,16 +367,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Get amount of current connected sids
 func (s *Server) AmountOfSids() int64 {
-	s.sidsLock.RLock()
-	defer s.sidsLock.RUnlock()
+	s.sidsMutex.RLock()
+	defer s.sidsMutex.RUnlock()
 
 	return int64(len(s.sids))
 }
 
 // Get amount of rooms with at least one channel(or sid) joined
 func (s *Server) AmountOfRooms() int64 {
-	s.channelsLock.RLock()
-	defer s.channelsLock.RUnlock()
+	s.channelsMutex.RLock()
+	defer s.channelsMutex.RUnlock()
 
 	return int64(len(s.channels))
 }
