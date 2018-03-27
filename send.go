@@ -14,9 +14,9 @@ var (
 	ErrorSocketOverflood = errors.New("socket overflood")
 )
 
-// send message packet to socket
+// send message packet to the given channel c with payload
 func send(message *protocol.Message, c *Channel, payload interface{}) error {
-	// preventing json/encoding "index out of range" panic
+	// preventing encoding/json "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Log().Warn("socket.io send panic: ", r)
@@ -28,7 +28,6 @@ func send(message *protocol.Message, c *Channel, payload interface{}) error {
 		if err != nil {
 			return err
 		}
-
 		message.Args = string(b)
 	}
 
@@ -42,33 +41,23 @@ func send(message *protocol.Message, c *Channel, payload interface{}) error {
 	}
 
 	c.out <- command
-
 	return nil
 }
 
-// Emit the event with given name and payload
+// Emit an asynchronous event with the given name and payload
 func (c *Channel) Emit(name string, payload interface{}) error {
-	msg := &protocol.Message{
-		Type:  protocol.MessageTypeEmit,
-		Event: name,
-	}
-
-	return send(msg, c, payload)
+	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
+	return send(message, c, payload)
 }
 
-// Create ack packet based on given data and send it and receive response
-func (c *Channel) Ack(method string, payload interface{}, timeout time.Duration) (string, error) {
-	msg := &protocol.Message{
-		Type:  protocol.MessageTypeAckRequest,
-		AckId: c.ack.getNextId(),
-		Event: method,
-	}
+// Ack a synchronous event with the given name and payload and wait for/receive the response
+func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
+	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.getNextId(), Event: name}
 
 	waiter := make(chan string)
 	c.ack.addWaiter(msg.AckId, waiter)
 
-	err := send(msg, c, payload)
-	if err != nil {
+	if err := send(msg, c, payload); err != nil {
 		c.ack.removeWaiter(msg.AckId)
 	}
 
