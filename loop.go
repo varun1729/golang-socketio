@@ -15,8 +15,8 @@ const (
 	queueBufferSize = 500
 )
 
-// header represents engine.io header to send or receive
-type header struct {
+// connectionHeader represents engine.io connection header
+type connectionHeader struct {
 	Sid          string   `json:"sid"`
 	Upgrades     []string `json:"upgrades"`
 	PingInterval int      `json:"pingInterval"`
@@ -32,19 +32,19 @@ type header struct {
 type Channel struct {
 	conn transport.Connection
 
-	out      chan string
-	stub     chan string
-	upgraded chan string
-	header   header
+	out        chan string
+	stub       chan string
+	upgraded   chan string
+	connHeader connectionHeader
 
 	alive      bool
 	aliveMutex sync.Mutex
 
 	ack ackProcessor
 
-	server        *Server
-	ip            string
-	requestHeader http.Header
+	server  *Server
+	address string
+	header  http.Header
 }
 
 // initChannel initializes Channel
@@ -55,7 +55,7 @@ func (c *Channel) initChannel() {
 }
 
 // Id returns an ID of the current socket connection
-func (c *Channel) Id() string { return c.header.Sid }
+func (c *Channel) Id() string { return c.connHeader.Sid }
 
 // IsAlive checks that Channel is still alive
 func (c *Channel) IsAlive() bool {
@@ -132,7 +132,7 @@ func (c *Channel) inLoop(m *methods) error {
 		switch decodedMessage.Type {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen: %+v", decodedMessage)
-			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.header); err != nil {
+			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.connHeader); err != nil {
 				closeChannel(c, m)
 			}
 			m.callLoopEvent(c, OnConnection)

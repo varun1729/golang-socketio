@@ -48,11 +48,11 @@ func (c *Channel) Ip() string {
 	if forward != "" {
 		return forward
 	}
-	return c.ip
+	return c.address
 }
 
-// RequestHeader returns a connection request header
-func (c *Channel) RequestHeader() http.Header { return c.requestHeader }
+// RequestHeader returns a connection request connectionHeader
+func (c *Channel) RequestHeader() http.Header { return c.header }
 
 // GetChannel by it's sid
 func (s *Server) GetChannel(sid string) (*Channel, error) {
@@ -111,12 +111,11 @@ func (c *Channel) Leave(room string) error {
 	return nil
 }
 
-// Amount returns an amount of channels joined to the given room
+// Amount returns an amount of channels joined to the given room, using channel
 func (c *Channel) Amount(room string) int {
 	if c.server == nil {
 		return 0
 	}
-
 	return c.server.Amount(room)
 }
 
@@ -124,21 +123,19 @@ func (c *Channel) Amount(room string) int {
 func (s *Server) Amount(room string) int {
 	s.channelsMutex.RLock()
 	defer s.channelsMutex.RUnlock()
-
 	roomChannels, _ := s.channels[room]
 	return len(roomChannels)
 }
 
-// Get list of channels, joined to given room, using channel
+// List returns a list of channels joined to the given room, using channel
 func (c *Channel) List(room string) []*Channel {
 	if c.server == nil {
 		return []*Channel{}
 	}
-
 	return c.server.List(room)
 }
 
-// Get list of channels, joined to given room, using server
+// List returns a list of channels joined to the given room, using server
 func (s *Server) List(room string) []*Channel {
 	s.channelsMutex.RLock()
 	defer s.channelsMutex.RUnlock()
@@ -156,17 +153,17 @@ func (s *Server) List(room string) []*Channel {
 	}
 
 	return roomChannelsCopy
-
 }
 
-func (c *Channel) BroadcastTo(room, method string, payload interface{}) {
+// BroadcastTo the the given room an event with payload, using channel
+func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
 	if c.server == nil {
 		return
 	}
-	c.server.BroadcastTo(room, method, payload)
+	c.server.BroadcastTo(room, event, payload)
 }
 
-// Broadcast message to all room channels
+// BroadcastTo the the given room an event with payload, using server
 func (s *Server) BroadcastTo(room, method string, payload interface{}) {
 	s.channelsMutex.RLock()
 	defer s.channelsMutex.RUnlock()
@@ -195,51 +192,52 @@ func (s *Server) BroadcastToAll(method string, payload interface{}) {
 	}
 }
 
-// Generate new id for socket.io connection
+// generateNewId for the socket.io connection
 func generateNewId(custom string) string {
 	hash := fmt.Sprintf("%s %s %n %n", custom, time.Now(), rand.Uint32(), rand.Uint32())
-	buf := bytes.NewBuffer(nil)
-	sum := md5.Sum([]byte(hash))
+	buf, sum := bytes.NewBuffer(nil), md5.Sum([]byte(hash))
 	encoder := base64.NewEncoder(base64.URLEncoding, buf)
 	encoder.Write(sum[:])
 	encoder.Close()
 	return buf.String()[:20]
 }
 
-// On connection system handler, store sid
-func onConnectStore(c *Channel) {
+// onConnection fires on connection and on connection upgrade
+func onConnection(c *Channel) {
 	c.server.sidsMutex.Lock()
-	defer c.server.sidsMutex.Unlock()
 	c.server.sids[c.Id()] = c
+	c.server.sidsMutex.Unlock()
 }
 
-// On disconnection system handler, clean joins and sid
-func onDisconnectCleanup(c *Channel) {
+// onDisconnection fires on disconnection
+func onDisconnection(c *Channel) {
 	c.server.channelsMutex.Lock()
 	defer c.server.channelsMutex.Unlock()
 
-	byRoom, ok := c.server.rooms[c]
-	if ok {
-		for room := range byRoom {
-			if curRoom, ok := c.server.channels[room]; ok {
-				delete(curRoom, c)
-				if len(curRoom) == 0 {
-					delete(c.server.channels, room)
-				}
-			}
-		}
+	defer func() {
+		c.server.sidsMutex.Lock()
+		defer c.server.sidsMutex.Unlock()
+		delete(c.server.sids, c.Id())
+	}()
 
-		delete(c.server.rooms, c)
+	_, ok := c.server.rooms[c]
+	if !ok {
+		return
 	}
 
-	c.server.sidsMutex.Lock()
-	defer c.server.sidsMutex.Unlock()
-
-	delete(c.server.sids, c.Id())
+	for room := range c.server.rooms[c] {
+		if curRoom, ok := c.server.channels[room]; ok {
+			delete(curRoom, c)
+			if len(curRoom) == 0 {
+				delete(c.server.channels, room)
+			}
+		}
+	}
+	delete(c.server.rooms, c)
 }
 
-func (s *Server) SendOpenSequence(c *Channel) {
-	jsonHdr, err := json.Marshal(&c.header)
+func (s *Server) sendOpenSequence(c *Channel) {
+	jsonHdr, err := json.Marshal(&c.connHeader)
 	if err != nil {
 		panic(err)
 	}
@@ -247,32 +245,25 @@ func (s *Server) SendOpenSequence(c *Channel) {
 	c.out <- protocol.MustEncode(&protocol.Message{Type: protocol.MessageTypeEmpty})
 }
 
-// Setup event loop for given connection
-func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string, requestHeader http.Header) {
-
+// setupEventLoop for the given connection
+func (s *Server) setupEventLoop(conn transport.Connection, address string, header http.Header) {
 	interval, timeout := conn.PingParams()
-	hdr := header{
-		Sid:          generateNewId(remoteAddr),
+	connHeader := connectionHeader{
+		Sid:          generateNewId(address),
 		Upgrades:     []string{"websocket"},
 		PingInterval: int(interval / time.Millisecond),
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
 
-	c := &Channel{
-		conn:          conn,
-		ip:            remoteAddr,
-		requestHeader: requestHeader,
-		server:        s,
-		header:        hdr,
-	}
+	c := &Channel{conn: conn, address: address, header: header, server: s, connHeader: connHeader}
 	c.initChannel()
 
 	switch conn.(type) {
 	case *transport.PollingConnection:
-		conn.(*transport.PollingConnection).Transport.SetSid(hdr.Sid, conn)
+		conn.(*transport.PollingConnection).Transport.SetSid(connHeader.Sid, conn)
 	}
 
-	s.SendOpenSequence(c)
+	s.sendOpenSequence(c)
 
 	go c.inLoop(&s.methods)
 	go c.outLoop(&s.methods)
@@ -280,50 +271,43 @@ func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string, re
 	s.callLoopEvent(c, OnConnection)
 }
 
-// Setup event loop when upgrading connection
-func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr string, requestHeader http.Header, sid string) {
-	logging.Log().Debug("SetupUpgradeEventLoop")
+// setupUpgradeEventLoop for connection upgrading
+func (s *Server) setupUpgradeEventLoop(conn transport.Connection, remoteAddr string, header http.Header, sid string) {
+	logging.Log().Debug("setupUpgradeEventLoop(): entered")
 
 	cp, err := s.GetChannel(sid)
 	if err != nil {
-		logging.Log().Warnf("can't find channel for session: ", sid)
+		logging.Log().Warnf("setupUpgradeEventLoop() can't find channel for session %s", sid)
 		return
 	}
 
-	logging.Log().Debug("SetupUpgradeEventLoop close")
+	logging.Log().Debug("setupUpgradeEventLoop() obtained channel")
 	interval, timeout := conn.PingParams()
-	hdr := header{
+	connHeader := connectionHeader{
 		Sid:          sid,
 		Upgrades:     []string{},
 		PingInterval: int(interval / time.Millisecond),
 		PingTimeout:  int(timeout / time.Millisecond),
 	}
 
-	c := &Channel{
-		conn:          conn,
-		ip:            remoteAddr,
-		requestHeader: requestHeader,
-		server:        s,
-		header:        hdr,
-	}
+	c := &Channel{conn: conn, address: remoteAddr, header: header, server: s, connHeader: connHeader}
 	c.initChannel()
-	logging.Log().Debug("SetupUpgradeEventLoop init channel")
+	logging.Log().Debug("setupUpgradeEventLoop init channel")
 
 	go c.inLoop(&s.methods)
 	go c.outLoop(&s.methods)
 
-	logging.Log().Debug("SetupUpgradeEventLoop go loops")
-	onConnectStore(c)
+	logging.Log().Debug("setupUpgradeEventLoop go loops")
+	onConnection(c)
 
 	// synchronize stubbing polling channel with receiving "2probe" message
 	<-c.upgraded
 	cp.Stub()
 }
 
-// implements ServeHTTP function from http.Handler
+// ServeHTTP makes Server to implement http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	session := r.URL.Query().Get("sid")
-	transportName := r.URL.Query().Get("transport")
+	session, transportName := r.URL.Query().Get("sid"), r.URL.Query().Get("transport")
 
 	switch transportName {
 	case "polling":
@@ -338,7 +322,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
+		s.setupEventLoop(conn, r.RemoteAddr, r.Header)
 		logging.Log().Debug("PollingConnection created")
 		conn.(*transport.PollingConnection).PollingWriter(w, r)
 
@@ -350,7 +334,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				logging.Log().Debug("upgrade error ", err)
 				return
 			}
-			s.SetupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
+			s.setupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
 			logging.Log().Debug("WebsocketConnection upgraded")
 			return
 		}
@@ -360,30 +344,28 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.SetupEventLoop(conn, r.RemoteAddr, r.Header)
+		s.setupEventLoop(conn, r.RemoteAddr, r.Header)
 		logging.Log().Debug("WebsocketConnection created")
 	}
 }
 
-// Get amount of current connected sids
+// AmountOfSids returns an amount of connected channels
 func (s *Server) AmountOfSids() int64 {
 	s.sidsMutex.RLock()
 	defer s.sidsMutex.RUnlock()
-
 	return int64(len(s.sids))
 }
 
-// Get amount of rooms with at least one channel(or sid) joined
+// AmountOfRooms returns an amount of rooms with at least channel joined each
 func (s *Server) AmountOfRooms() int64 {
 	s.channelsMutex.RLock()
 	defer s.channelsMutex.RUnlock()
-
 	return int64(len(s.channels))
 }
 
-// Create new socket.io server
+// NewServer creates new socket.io server
 func NewServer() *Server {
-	s := Server{
+	s := &Server{
 		websocket: transport.GetDefaultWebsocketTransport(),
 		polling:   transport.GetDefaultPollingTransport(),
 		channels:  make(map[string]map[*Channel]struct{}),
@@ -392,8 +374,6 @@ func NewServer() *Server {
 	}
 
 	s.initEvents()
-	s.onConnection = onConnectStore
-	s.onDisconnection = onDisconnectCleanup
-
-	return &s
+	s.onConnection, s.onDisconnection = onConnection, onDisconnection
+	return s
 }
