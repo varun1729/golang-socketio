@@ -15,17 +15,17 @@ const (
 	queueBufferSize = 500
 )
 
-// engine.io header to send or receive
-type Header struct {
+// header represents engine.io header to send or receive
+type header struct {
 	Sid          string   `json:"sid"`
 	Upgrades     []string `json:"upgrades"`
 	PingInterval int      `json:"pingInterval"`
 	PingTimeout  int      `json:"pingTimeout"`
 }
 
-// socket.io connection handler
+// Channel represents socket.io connection
 // use IsAlive to check that handler is still working
-// use Dial to connect to websocket
+// use Dial to connect via the chosen transport
 // use In and Out channels for message exchange
 // Close message means channel is closed
 // ping is automatic
@@ -35,7 +35,7 @@ type Channel struct {
 	out      chan string
 	stub     chan string
 	upgraded chan string
-	header   Header
+	header   header
 
 	alive     bool
 	aliveLock sync.Mutex
@@ -47,98 +47,59 @@ type Channel struct {
 	requestHeader http.Header
 }
 
-// create channel, map, and set active
+// initChannel initializes Channel
 func (c *Channel) initChannel() {
-	//TODO: queueBufferSize from constant to server or client variable
-	c.out = make(chan string, queueBufferSize)
-	c.stub = make(chan string)
-	c.upgraded = make(chan string)
+	c.out, c.stub, c.upgraded = make(chan string, queueBufferSize), make(chan string), make(chan string)
 	c.ack.resultWaiters = make(map[int](chan string))
 	c.alive = true
 }
 
-// Get id of current socket connection
-func (c *Channel) Id() string {
-	return c.header.Sid
-}
+// Id returns an ID of the current socket connection
+func (c *Channel) Id() string { return c.header.Sid }
 
-// Checks that Channel is still alive
+// IsAlive checks that Channel is still alive
 func (c *Channel) IsAlive() bool {
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 	return c.alive
 }
 
-// Close закрывает соединение для клиента (канала)
-func (c *Channel) Close() error {
-	return CloseChannel(c, &c.server.methods)
-}
+// Close the client (Channel) connection
+func (c *Channel) Close() error { return closeChannel(c, &c.server.methods) }
 
-// Close закрывает соединение для поллинга (канала) при апгрейде
-func (c *Channel) Stub() error {
-	return StubChannel(c)
-}
+// Stub closes the polling client (Channel) connection at socket.io upgrade
+func (c *Channel) Stub() error { return closeChannel(c, nil) }
 
-// Close channel
-func CloseChannel(c *Channel, m *methods) error {
+// closeChannel
+func closeChannel(c *Channel, m *methods) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
-		logging.Log().Debug("close channel type: PollingConnection")
+		logging.Log().Debug("closeChannel() type: PollingConnection")
 	case *transport.WebsocketConnection:
-		logging.Log().Debug("close channel type: WebsocketConnection")
+		logging.Log().Debug("closeChannel() type: WebsocketConnection")
 	}
 
 	c.aliveLock.Lock()
 	defer c.aliveLock.Unlock()
 
-	if !c.alive {
-		//already closed
+	if !c.alive { // already closed
 		return nil
 	}
 
 	c.conn.Close()
 	c.alive = false
 
-	//clean outloop
+	// clean outloop
 	for len(c.out) > 0 {
 		<-c.out
 	}
 
-	c.out <- protocol.MessageClose
-	m.callLoopEvent(c, OnDisconnection)
-
-	overfloodedLock.Lock()
-	delete(overflooded, c)
-	overfloodedLock.Unlock()
-
-	return nil
-}
-
-// Stub channel when upgrading transport
-func StubChannel(c *Channel) error {
-	switch c.conn.(type) {
-	case *transport.PollingConnection:
-		logging.Log().Debug("Stub channel type: PollingConnection")
-	case *transport.WebsocketConnection:
-		logging.Log().Debug("Stub channel type: WebsocketConnection")
+	if m != nil { // close
+		c.out <- protocol.MessageClose
+		m.callLoopEvent(c, OnDisconnection)
+	} else { // stub at transport upgrade
+		c.out <- protocol.MessageStub
 	}
-
-	c.aliveLock.Lock()
-	defer c.aliveLock.Unlock()
-
-	if !c.alive {
-		//already closed
-		return nil
-	}
-	c.conn.Close()
-	c.alive = false
-
-	//clean outloop
-	for len(c.out) > 0 {
-		<-c.out
-	}
-
-	c.out <- protocol.MessageStub
 
 	overfloodedLock.Lock()
 	delete(overflooded, c)
@@ -153,7 +114,7 @@ func inLoop(c *Channel, m *methods) error {
 		pkg, err := c.conn.GetMessage()
 		if err != nil {
 			logging.Log().Debug("c.conn.GetMessage err ", err, " pkg: ", pkg)
-			return CloseChannel(c, m)
+			return closeChannel(c, m)
 		}
 
 		if pkg == transport.StopMessage {
@@ -164,7 +125,7 @@ func inLoop(c *Channel, m *methods) error {
 		msg, err := protocol.Decode(pkg)
 		if err != nil {
 			logging.Log().Debug("Decoding err: ", err, " pkg: ", pkg)
-			CloseChannel(c, m)
+			closeChannel(c, m)
 			return err
 		}
 
@@ -172,7 +133,7 @@ func inLoop(c *Channel, m *methods) error {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debug("protocol.MessageTypeOpen: ", msg)
 			if err := json.Unmarshal([]byte(msg.Source[1:]), &c.header); err != nil {
-				CloseChannel(c, m)
+				closeChannel(c, m)
 			}
 			m.callLoopEvent(c, OnConnection)
 		case protocol.MessageTypePing:
@@ -212,7 +173,7 @@ func outLoop(c *Channel, m *methods) error {
 		logging.Log().Debug("outBufferLen: ", outBufferLen)
 		if outBufferLen >= queueBufferSize-1 {
 			logging.Log().Debug("outBufferLen >= queueBufferSize-1")
-			return CloseChannel(c, m)
+			return closeChannel(c, m)
 		} else if outBufferLen > int(queueBufferSize/2) {
 			overfloodedLock.Lock()
 			overflooded[c] = struct{}{}
@@ -230,7 +191,7 @@ func outLoop(c *Channel, m *methods) error {
 		}
 
 		if err := c.conn.WriteMessage(msg); err != nil {
-			return CloseChannel(c, m)
+			return closeChannel(c, m)
 		}
 	}
 	return nil

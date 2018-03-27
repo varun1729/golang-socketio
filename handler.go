@@ -71,10 +71,7 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 	f.callFunc(c, &struct{}{})
 }
 
-// Check incoming message
-// On ack_resp - look for waiter
-// On ack_req - look for processing function and send ack_resp
-// On emit - look for processing function
+// processIncomingEvent checks incoming message
 func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 	logging.Log().Debug("processIncomingEvent():", msg)
 	switch msg.Type {
@@ -122,12 +119,12 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 			result = f.callFunc(c, &struct{}{})
 		}
 
-		ack := &protocol.Message{
+		ackResponse := &protocol.Message{
 			Type:  protocol.MessageTypeAckResponse,
 			AckId: msg.AckId,
 		}
 
-		send(ack, c, result[0].Interface())
+		send(ackResponse, c, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
 		logging.Log().Debug("processIncomingEvent(): ack response")

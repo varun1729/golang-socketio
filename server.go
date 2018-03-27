@@ -268,7 +268,7 @@ func (s *Server) SendOpenSequence(c *Channel) {
 func (s *Server) SetupEventLoop(conn transport.Connection, remoteAddr string, requestHeader http.Header) {
 
 	interval, timeout := conn.PingParams()
-	hdr := Header{
+	hdr := header{
 		Sid:          generateNewId(remoteAddr),
 		Upgrades:     []string{"websocket"},
 		PingInterval: int(interval / time.Millisecond),
@@ -309,7 +309,7 @@ func (s *Server) SetupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 
 	logging.Log().Debug("SetupUpgradeEventLoop close")
 	interval, timeout := conn.PingParams()
-	hdr := Header{
+	hdr := header{
 		Sid:          sid,
 		Upgrades:     []string{},
 		PingInterval: int(interval / time.Millisecond),
