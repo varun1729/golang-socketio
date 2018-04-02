@@ -20,8 +20,8 @@ const (
 
 // Client represents socket.io client
 type Client struct {
-	methods
-	Channel
+	*event
+	*Channel
 }
 
 // AddrWebsocket returns an url for socket.io connection for websocket transport
@@ -46,9 +46,9 @@ func AddrPolling(host string, port int, secure bool) string {
 // The correct ws protocol addr example:
 // ws://myserver.com/socket.io/?EIO=3&transport=websocket
 func Dial(addr string, tr transport.Transport) (*Client, error) {
-	c := &Client{}
-	c.init()
-	c.methods.initEvents()
+	c := &Client{Channel: &Channel{}, event: &event{}}
+	c.Channel.init()
+	c.event.init()
 
 	var err error
 	c.conn, err = tr.Connect(addr)
@@ -56,17 +56,17 @@ func Dial(addr string, tr transport.Transport) (*Client, error) {
 		return nil, err
 	}
 
-	go c.Channel.inLoop(&c.methods)
-	go c.Channel.outLoop(&c.methods)
+	go c.Channel.inLoop(c.event)
+	go c.Channel.outLoop(c.event)
 	go c.Channel.pingLoop()
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
-		go c.methods.callLoopEvent(&c.Channel, OnConnection)
+		go c.event.callLoopEvent(c.Channel, OnConnection)
 	}
 
 	return c, nil
 }
 
 // Close client connection
-func (c *Client) Close() { c.Channel.close(&c.methods) }
+func (c *Client) Close() { c.Channel.close(c.event) }

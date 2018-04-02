@@ -65,13 +65,13 @@ func (c *Channel) IsAlive() bool {
 }
 
 // Close the client (Channel) connection
-func (c *Channel) Close() error { return c.close(&c.server.methods) }
+func (c *Channel) Close() error { return c.close(c.server.event) }
 
 // stub closes the polling client (Channel) connection at socket.io upgrade
 func (c *Channel) stub() error { return c.close(nil) }
 
 // close channel
-func (c *Channel) close(m *methods) error {
+func (c *Channel) close(m *event) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
 		logging.Log().Debug("close() type: PollingConnection")
@@ -109,7 +109,7 @@ func (c *Channel) close(m *methods) error {
 }
 
 // inLoop is an incoming messages loop
-func (c *Channel) inLoop(m *methods) error {
+func (c *Channel) inLoop(m *event) error {
 	for {
 		message, err := c.conn.GetMessage()
 		if err != nil {
@@ -169,7 +169,7 @@ func CountOverfloodingChannels() int {
 }
 
 // outLoop is an outgoing messages loop, sends messages from channel to socket
-func (c *Channel) outLoop(m *methods) error {
+func (c *Channel) outLoop(m *event) error {
 	for {
 		outBufferLen := len(c.outC)
 		logging.Log().Debug("outLoop(), outBufferLen: ", outBufferLen)

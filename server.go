@@ -28,7 +28,7 @@ var (
 
 // Server represents a socket.io server instance
 type Server struct {
-	methods
+	*event
 	http.Handler
 
 	channels   map[string]map[*Channel]struct{} // maps room name to map of channels to an empty struct
@@ -40,6 +40,23 @@ type Server struct {
 
 	websocket *transport.WebsocketTransport
 	polling   *transport.PollingTransport
+}
+
+// NewServer creates new socket.io server
+func NewServer() *Server {
+	s := &Server{
+		websocket: transport.GetDefaultWebsocketTransport(),
+		polling:   transport.GetDefaultPollingTransport(),
+		channels:  make(map[string]map[*Channel]struct{}),
+		rooms:     make(map[*Channel]map[string]struct{}),
+		sids:      make(map[string]*Channel),
+		event: &event{
+			onConnection:    onConnection,
+			onDisconnection: onDisconnection,
+		},
+	}
+	s.event.init()
+	return s
 }
 
 // IP returns an IP of the socket client
@@ -155,7 +172,7 @@ func (s *Server) List(room string) []*Channel {
 	return roomChannelsCopy
 }
 
-// BroadcastTo the the given room an event with payload, using channel
+// BroadcastTo the the given room an handler with payload, using channel
 func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
 	if c.server == nil {
 		return
@@ -163,7 +180,7 @@ func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
 	c.server.BroadcastTo(room, event, payload)
 }
 
-// BroadcastTo the the given room an event with payload, using server
+// BroadcastTo the the given room an handler with payload, using server
 func (s *Server) BroadcastTo(room, method string, payload interface{}) {
 	s.channelsMu.RLock()
 	defer s.channelsMu.RUnlock()
@@ -262,8 +279,8 @@ func (s *Server) setupEventLoop(conn transport.Connection, address string, heade
 
 	s.sendOpenSequence(c)
 
-	go c.inLoop(&s.methods)
-	go c.outLoop(&s.methods)
+	go c.inLoop(s.event)
+	go c.outLoop(s.event)
 
 	s.callLoopEvent(c, OnConnection)
 }
@@ -291,8 +308,8 @@ func (s *Server) setupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 	c.init()
 	logging.Log().Debug("setupUpgradeEventLoop init channel")
 
-	go c.inLoop(&s.methods)
-	go c.outLoop(&s.methods)
+	go c.inLoop(s.event)
+	go c.outLoop(s.event)
 
 	logging.Log().Debug("setupUpgradeEventLoop go loops")
 	onConnection(c)
@@ -358,21 +375,4 @@ func (s *Server) CountRooms() int {
 	s.channelsMu.RLock()
 	defer s.channelsMu.RUnlock()
 	return len(s.channels)
-}
-
-// NewServer creates new socket.io server
-func NewServer() *Server {
-	s := &Server{
-		websocket: transport.GetDefaultWebsocketTransport(),
-		polling:   transport.GetDefaultPollingTransport(),
-		channels:  make(map[string]map[*Channel]struct{}),
-		rooms:     make(map[*Channel]map[string]struct{}),
-		sids:      make(map[string]*Channel),
-		methods: methods{
-			onConnection:    onConnection,
-			onDisconnection: onDisconnection,
-		},
-	}
-	s.methods.initEvents()
-	return s
 }

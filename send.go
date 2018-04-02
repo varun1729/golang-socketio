@@ -44,13 +44,13 @@ func (c *Channel) send(message *protocol.Message, payload interface{}) error {
 	return nil
 }
 
-// Emit an asynchronous event with the given name and payload
+// Emit an asynchronous handler with the given name and payload
 func (c *Channel) Emit(name string, payload interface{}) error {
 	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
 	return c.send(message, payload)
 }
 
-// Ack a synchronous event with the given name and payload and wait for/receive the response
+// Ack a synchronous handler with the given name and payload and wait for/receive the response
 func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
 	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.nextId(), Event: name}
 
