@@ -40,7 +40,7 @@ type Channel struct {
 	alive      bool
 	aliveMutex sync.Mutex
 
-	ack ackProcessor
+	ack ackChannels
 
 	server  *Server
 	address string
@@ -50,7 +50,7 @@ type Channel struct {
 // initChannel initializes Channel
 func (c *Channel) initChannel() {
 	c.out, c.stub, c.upgraded = make(chan string, queueBufferSize), make(chan string), make(chan string)
-	c.ack.resultWaiters = make(map[int](chan string))
+	c.ack.ackC = make(map[int](chan string))
 	c.alive = true
 }
 
@@ -65,18 +65,18 @@ func (c *Channel) IsAlive() bool {
 }
 
 // Close the client (Channel) connection
-func (c *Channel) Close() error { return closeChannel(c, &c.server.methods) }
+func (c *Channel) Close() error { return c.close(&c.server.methods) }
 
 // Stub closes the polling client (Channel) connection at socket.io upgrade
-func (c *Channel) Stub() error { return closeChannel(c, nil) }
+func (c *Channel) Stub() error { return c.close(nil) }
 
-// closeChannel
-func closeChannel(c *Channel, m *methods) error {
+// close channel
+func (c *Channel) close(m *methods) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
-		logging.Log().Debug("closeChannel() type: PollingConnection")
+		logging.Log().Debug("close() type: PollingConnection")
 	case *transport.WebsocketConnection:
-		logging.Log().Debug("closeChannel() type: WebsocketConnection")
+		logging.Log().Debug("close() type: WebsocketConnection")
 	}
 
 	c.aliveMutex.Lock()
@@ -114,7 +114,7 @@ func (c *Channel) inLoop(m *methods) error {
 		message, err := c.conn.GetMessage()
 		if err != nil {
 			logging.Log().Debugf("inLoop(), c.conn.GetMessage() err: %v, message: %s", err, message)
-			return closeChannel(c, m)
+			return c.close(m)
 		}
 
 		if message == transport.StopMessage {
@@ -125,7 +125,7 @@ func (c *Channel) inLoop(m *methods) error {
 		decodedMessage, err := protocol.Decode(message)
 		if err != nil {
 			logging.Log().Debugf("inLoop() decoding err: %v, message: %s", err, message)
-			closeChannel(c, m)
+			c.close(m)
 			return err
 		}
 
@@ -133,7 +133,7 @@ func (c *Channel) inLoop(m *methods) error {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen: %+v", decodedMessage)
 			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.connHeader); err != nil {
-				closeChannel(c, m)
+				c.close(m)
 			}
 			m.callLoopEvent(c, OnConnection)
 
@@ -161,11 +161,11 @@ func (c *Channel) inLoop(m *methods) error {
 var overflooded = make(map[*Channel]struct{})
 var overfloodedMutex sync.Mutex
 
-// OverfloodedChannelsCount returns an amount of overflooding channels
-func OverfloodedChannelsCount() int64 {
+// CountOverfloodingChannels returns an amount of overflooding channels
+func CountOverfloodingChannels() int {
 	overfloodedMutex.Lock()
 	defer overfloodedMutex.Unlock()
-	return int64(len(overflooded))
+	return len(overflooded)
 }
 
 // outLoop is an outgoing messages loop, sends messages from channel to socket
@@ -176,7 +176,7 @@ func (c *Channel) outLoop(m *methods) error {
 		switch {
 		case outBufferLen >= queueBufferSize-1:
 			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
-			return closeChannel(c, m)
+			return c.close(m)
 		case outBufferLen > int(queueBufferSize/2):
 			overfloodedMutex.Lock()
 			overflooded[c] = struct{}{}
@@ -195,7 +195,7 @@ func (c *Channel) outLoop(m *methods) error {
 
 		if err := c.conn.WriteMessage(msg); err != nil {
 			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage(), err: ", err)
-			return closeChannel(c, m)
+			return c.close(m)
 		}
 	}
 	return nil

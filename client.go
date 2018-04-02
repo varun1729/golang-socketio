@@ -49,7 +49,7 @@ func GetUrlPolling(host string, port int, secure bool) string {
 func Dial(url string, tr transport.Transport) (*Client, error) {
 	c := &Client{}
 	c.initChannel()
-	c.initEvents()
+	c.methods.initEvents()
 
 	var err error
 	c.conn, err = tr.Connect(url)
@@ -70,4 +70,4 @@ func Dial(url string, tr transport.Transport) (*Client, error) {
 }
 
 // Close client connection
-func (c *Client) Close() { closeChannel(&c.Channel, &c.methods) }
+func (c *Client) Close() { c.Channel.close(&c.methods) }

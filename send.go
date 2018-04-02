@@ -15,7 +15,7 @@ var (
 )
 
 // send message packet to the given channel c with payload
-func send(message *protocol.Message, c *Channel, payload interface{}) error {
+func (c *Channel) send(message *protocol.Message, payload interface{}) error {
 	// preventing encoding/json "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -47,25 +47,25 @@ func send(message *protocol.Message, c *Channel, payload interface{}) error {
 // Emit an asynchronous event with the given name and payload
 func (c *Channel) Emit(name string, payload interface{}) error {
 	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
-	return send(message, c, payload)
+	return c.send(message, payload)
 }
 
 // Ack a synchronous event with the given name and payload and wait for/receive the response
 func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
-	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.getNextId(), Event: name}
+	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.nextId(), Event: name}
 
-	waiter := make(chan string)
-	c.ack.addWaiter(msg.AckId, waiter)
+	ackC := make(chan string)
+	c.ack.register(msg.AckId, ackC)
 
-	if err := send(msg, c, payload); err != nil {
-		c.ack.removeWaiter(msg.AckId)
+	if err := c.send(msg, payload); err != nil {
+		c.ack.unregister(msg.AckId)
 	}
 
 	select {
-	case result := <-waiter:
+	case result := <-ackC:
 		return result, nil
 	case <-time.After(timeout):
-		c.ack.removeWaiter(msg.AckId)
+		c.ack.unregister(msg.AckId)
 		return "", ErrorSendTimeout
 	}
 }

@@ -51,19 +51,19 @@ func newHandler(f interface{}) (*handler, error) {
 }
 
 // getArguments returns function parameter as it is present in it using reflection
-func (c *handler) getArguments() interface{} { return reflect.New(c.arguments).Interface() }
+func (h *handler) getArguments() interface{} { return reflect.New(h.arguments).Interface() }
 
-// callFunc with given arguments from its representation using reflection
-func (c *handler) callFunc(h *Channel, arguments interface{}) []reflect.Value {
+// call func with given arguments from its representation using reflection
+func (h *handler) call(c *Channel, arguments interface{}) []reflect.Value {
 	// nil is untyped, so use the default empty value of correct type
 	if arguments == nil {
-		arguments = c.getArguments()
+		arguments = h.getArguments()
 	}
 
-	a := []reflect.Value{reflect.ValueOf(h), reflect.ValueOf(arguments).Elem()}
-	if !c.argumentsPresent {
+	a := []reflect.Value{reflect.ValueOf(c), reflect.ValueOf(arguments).Elem()}
+	if !h.argumentsPresent {
 		a = a[0:1]
 	}
 
-	return c.function.Call(a)
+	return h.function.Call(a)
 }

@@ -68,7 +68,7 @@ func (m *methods) callLoopEvent(c *Channel, event string) {
 		return
 	}
 
-	f.callFunc(c, &struct{}{})
+	f.call(c, &struct{}{})
 }
 
 // processIncomingEvent checks incoming message
@@ -86,7 +86,7 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		logging.Log().Debug("processIncomingEvent() found method: ", f)
 
 		if !f.argumentsPresent {
-			f.callFunc(c, &struct{}{})
+			f.call(c, &struct{}{})
 			return
 		}
 
@@ -98,7 +98,7 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 			return
 		}
 
-		f.callFunc(c, data)
+		f.call(c, data)
 
 	case protocol.MessageTypeAckRequest:
 		logging.Log().Debug("processIncomingEvent(): ack request")
@@ -114,9 +114,9 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 				return
 			}
-			result = f.callFunc(c, data)
+			result = f.call(c, data)
 		} else {
-			result = f.callFunc(c, &struct{}{})
+			result = f.call(c, &struct{}{})
 		}
 
 		ackResponse := &protocol.Message{
@@ -124,13 +124,13 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 			AckId: msg.AckId,
 		}
 
-		send(ackResponse, c, result[0].Interface())
+		c.send(ackResponse, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
 		logging.Log().Debug("processIncomingEvent(): ack response")
-		waiter, err := c.ack.getWaiter(msg.AckId)
+		ackC, err := c.ack.obtain(msg.AckId)
 		if err == nil {
-			waiter <- msg.Args
+			ackC <- msg.Args
 		}
 	}
 }

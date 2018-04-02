@@ -349,18 +349,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// AmountOfSids returns an amount of connected channels
-func (s *Server) AmountOfSids() int64 {
+// CountChannels returns an amount of connected channels
+func (s *Server) CountChannels() int {
 	s.sidsMutex.RLock()
 	defer s.sidsMutex.RUnlock()
-	return int64(len(s.sids))
+	return len(s.sids)
 }
 
-// AmountOfRooms returns an amount of rooms with at least channel joined each
-func (s *Server) AmountOfRooms() int64 {
+// CountRooms returns an amount of rooms with at least one joined channel
+func (s *Server) CountRooms() int {
 	s.channelsMutex.RLock()
 	defer s.channelsMutex.RUnlock()
-	return int64(len(s.channels))
+	return len(s.channels)
 }
 
 // NewServer creates new socket.io server
@@ -371,9 +371,11 @@ func NewServer() *Server {
 		channels:  make(map[string]map[*Channel]struct{}),
 		rooms:     make(map[*Channel]map[string]struct{}),
 		sids:      make(map[string]*Channel),
+		methods: methods{
+			onConnection:    onConnection,
+			onDisconnection: onDisconnection,
+		},
 	}
-
-	s.initEvents()
-	s.onConnection, s.onDisconnection = onConnection, onDisconnection
+	s.methods.initEvents()
 	return s
 }
