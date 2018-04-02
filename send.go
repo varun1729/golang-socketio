@@ -36,11 +36,11 @@ func (c *Channel) send(message *protocol.Message, payload interface{}) error {
 		return err
 	}
 
-	if len(c.out) == queueBufferSize {
+	if len(c.outC) == queueBufferSize {
 		return ErrorSocketOverflood
 	}
 
-	c.out <- command
+	c.outC <- command
 	return nil
 }
 

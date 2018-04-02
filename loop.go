@@ -32,24 +32,24 @@ type connectionHeader struct {
 type Channel struct {
 	conn transport.Connection
 
-	out        chan string
-	stub       chan string
-	upgraded   chan string
+	outC       chan string
+	stubC      chan string
+	upgradedC  chan string
 	connHeader connectionHeader
 
 	alive      bool
 	aliveMutex sync.Mutex
 
-	ack ackChannels
+	ack acks
 
 	server  *Server
 	address string
 	header  http.Header
 }
 
-// initChannel initializes Channel
-func (c *Channel) initChannel() {
-	c.out, c.stub, c.upgraded = make(chan string, queueBufferSize), make(chan string), make(chan string)
+// init the Channel
+func (c *Channel) init() {
+	c.outC, c.stubC, c.upgradedC = make(chan string, queueBufferSize), make(chan string), make(chan string)
 	c.ack.ackC = make(map[int](chan string))
 	c.alive = true
 }
@@ -67,8 +67,8 @@ func (c *Channel) IsAlive() bool {
 // Close the client (Channel) connection
 func (c *Channel) Close() error { return c.close(&c.server.methods) }
 
-// Stub closes the polling client (Channel) connection at socket.io upgrade
-func (c *Channel) Stub() error { return c.close(nil) }
+// stub closes the polling client (Channel) connection at socket.io upgrade
+func (c *Channel) stub() error { return c.close(nil) }
 
 // close channel
 func (c *Channel) close(m *methods) error {
@@ -90,15 +90,15 @@ func (c *Channel) close(m *methods) error {
 	c.alive = false
 
 	// clean outloop
-	for len(c.out) > 0 {
-		<-c.out
+	for len(c.outC) > 0 {
+		<-c.outC
 	}
 
 	if m != nil { // close
-		c.out <- protocol.MessageClose
+		c.outC <- protocol.MessageClose
 		m.callLoopEvent(c, OnDisconnection)
 	} else { // stub at transport upgrade
-		c.out <- protocol.MessageStub
+		c.outC <- protocol.MessageStub
 	}
 
 	overfloodedMutex.Lock()
@@ -141,10 +141,10 @@ func (c *Channel) inLoop(m *methods) error {
 			logging.Log().Debugf("inLoop(), protocol.MessageTypePing: %+v", decodedMessage)
 			if decodedMessage.Source == protocol.MessagePingProbe {
 				logging.Log().Debugf("inLoop(), got %s", decodedMessage.Source)
-				c.out <- protocol.MessagePongProbe
-				c.upgraded <- transport.UpgradedMessage
+				c.outC <- protocol.MessagePongProbe
+				c.upgradedC <- transport.UpgradedMessage
 			} else {
-				c.out <- protocol.MessagePong
+				c.outC <- protocol.MessagePong
 			}
 
 		case protocol.MessageTypeUpgrade:
@@ -171,7 +171,7 @@ func CountOverfloodingChannels() int {
 // outLoop is an outgoing messages loop, sends messages from channel to socket
 func (c *Channel) outLoop(m *methods) error {
 	for {
-		outBufferLen := len(c.out)
+		outBufferLen := len(c.outC)
 		logging.Log().Debug("outLoop(), outBufferLen: ", outBufferLen)
 		switch {
 		case outBufferLen >= queueBufferSize-1:
@@ -187,7 +187,7 @@ func (c *Channel) outLoop(m *methods) error {
 			overfloodedMutex.Unlock()
 		}
 
-		msg := <-c.out
+		msg := <-c.outC
 
 		if msg == protocol.MessageClose || msg == protocol.MessageStub {
 			return nil
@@ -210,6 +210,6 @@ func (c *Channel) pingLoop() {
 			return
 		}
 
-		c.out <- protocol.MessagePing
+		c.outC <- protocol.MessagePing
 	}
 }

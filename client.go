@@ -24,8 +24,8 @@ type Client struct {
 	Channel
 }
 
-// GetUrl returns an url for socket.io connection for websocket transport
-func GetUrl(host string, port int, secure bool) string {
+// AddrWebsocket returns an url for socket.io connection for websocket transport
+func AddrWebsocket(host string, port int, secure bool) string {
 	prefix := webSocketSchema
 	if secure {
 		prefix = webSocketSecureSchema
@@ -33,8 +33,8 @@ func GetUrl(host string, port int, secure bool) string {
 	return prefix + host + ":" + strconv.Itoa(port) + socketioWebsocketURL
 }
 
-// GetUrlPolling returns an url for socket.io connection for polling transport
-func GetUrlPolling(host string, port int, secure bool) string {
+// AddrPolling returns an url for socket.io connection for polling transport
+func AddrPolling(host string, port int, secure bool) string {
 	prefix := pollingSchema
 	if secure {
 		prefix = pollingSecureSchema
@@ -42,28 +42,27 @@ func GetUrlPolling(host string, port int, secure bool) string {
 	return prefix + host + ":" + strconv.Itoa(port) + socketioPollingURL
 }
 
-// Dial connects to host and initializes socket.io protocol
-// The correct ws protocol url example:
+// Dial connects to server and initializes socket.io protocol
+// The correct ws protocol addr example:
 // ws://myserver.com/socket.io/?EIO=3&transport=websocket
-// Use GetUrlByHost to obtain the correct URL
-func Dial(url string, tr transport.Transport) (*Client, error) {
+func Dial(addr string, tr transport.Transport) (*Client, error) {
 	c := &Client{}
-	c.initChannel()
+	c.init()
 	c.methods.initEvents()
 
 	var err error
-	c.conn, err = tr.Connect(url)
+	c.conn, err = tr.Connect(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	go (&c.Channel).inLoop(&c.methods)
-	go (&c.Channel).outLoop(&c.methods)
-	go (&c.Channel).pingLoop()
+	go c.Channel.inLoop(&c.methods)
+	go c.Channel.outLoop(&c.methods)
+	go c.Channel.pingLoop()
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
-		go (&c.methods).callLoopEvent(&c.Channel, OnConnection)
+		go c.methods.callLoopEvent(&c.Channel, OnConnection)
 	}
 
 	return c, nil

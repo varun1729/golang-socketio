@@ -31,9 +31,9 @@ func sendJoin(c *gosocketio.Client) {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	//fmt.Println(gosocketio.GetUrl("localhost", 3811, false))
+	//fmt.Println(gosocketio.AddrWebsocket("localhost", 3811, false))
 	c, err := gosocketio.Dial(
-		gosocketio.GetUrlPolling("localhost", 3811, false),
+		gosocketio.AddrPolling("localhost", 3811, false),
 		transport.GetDefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
@@ -52,7 +52,7 @@ func main() {
 	c.Emit("send", "send sended")
 	/*c.Close()
 	c, err = gosocketio.Dial(
-		gosocketio.GetUrlPolling("localhost", 3811, false),
+		gosocketio.AddrPolling("localhost", 3811, false),
 		transport.GetDefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
@@ -61,7 +61,7 @@ func main() {
 	c.Close()
 
 	c, err = gosocketio.Dial(
-		gosocketio.GetUrlPolling("localhost", 3811, false),
+		gosocketio.AddrPolling("localhost", 3811, false),
 		transport.GetDefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)

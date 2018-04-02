@@ -11,8 +11,8 @@ var (
 	ErrorAckWaiterNotFound = errors.New("ack waiter not found")
 )
 
-// ackChannels represents chans needed for Ack messages to work
-type ackChannels struct {
+// acks represents chans needed for Ack messages to work
+type acks struct {
 	count synced.Counter
 
 	ackC  map[int]chan string
@@ -20,27 +20,27 @@ type ackChannels struct {
 }
 
 // nextId of ack waiter
-func (a *ackChannels) nextId() int {
+func (a *acks) nextId() int {
 	a.count.Inc()
 	return a.count.Get()
 }
 
 // register new ack request waiter
-func (a *ackChannels) register(id int, ackC chan string) {
+func (a *acks) register(id int, ackC chan string) {
 	a.ackMu.Lock()
 	a.ackC[id] = ackC
 	a.ackMu.Unlock()
 }
 
 // unregister a waiter by ack id that is unnecessary anymore
-func (a *ackChannels) unregister(id int) {
+func (a *acks) unregister(id int) {
 	a.ackMu.Lock()
 	delete(a.ackC, id)
 	a.ackMu.Unlock()
 }
 
 // obtain checks that waiter at given ack id exists and returns the appropriate chan
-func (a *ackChannels) obtain(id int) (chan string, error) {
+func (a *acks) obtain(id int) (chan string, error) {
 	a.ackMu.RLock()
 	defer a.ackMu.RUnlock()
 

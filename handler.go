@@ -45,6 +45,7 @@ func (m *methods) On(name string, f interface{}) error {
 }
 
 // findEvent returns a handler representation for the given event name
+// the second parameter is true if such event found.
 func (m *methods) findEvent(name string) (*handler, bool) {
 	m.eventHandlersMutex.RLock()
 	f, ok := m.eventHandlers[name]
@@ -85,13 +86,13 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 
 		logging.Log().Debug("processIncomingEvent() found method: ", f)
 
-		if !f.argumentsPresent {
+		if !f.hasArgs {
 			f.call(c, &struct{}{})
 			return
 		}
 
-		data := f.getArguments()
-		logging.Log().Debug("processIncomingEvent(): f.getArguments() returned ", data)
+		data := f.arguments()
+		logging.Log().Debug("processIncomingEvent(): f.arguments() returned ", data)
 
 		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 			logging.Log().Infof("Error processing message. msg.Args: %s, data: %v, err: %v", msg.Args, data, err)
@@ -108,9 +109,9 @@ func (m *methods) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		}
 
 		var result []reflect.Value
-		if f.argumentsPresent {
+		if f.hasArgs {
 			// data type should be defined for Unmarshal()
-			data := f.getArguments()
+			data := f.arguments()
 			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
 				return
 			}
