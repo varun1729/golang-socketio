@@ -2,6 +2,7 @@ package gosocketio
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -13,6 +14,15 @@ import (
 
 const (
 	queueBufferSize = 500
+)
+
+const (
+	HeaderForward = "X-Forwarded-For"
+)
+
+var (
+	ErrorSendTimeout     = errors.New("timeout")
+	ErrorSocketOverflood = errors.New("socket overflood")
 )
 
 // connectionHeader represents engine.io connection header
@@ -37,10 +47,10 @@ type Channel struct {
 	upgradedC  chan string
 	connHeader connectionHeader
 
-	alive      bool
-	aliveMutex sync.Mutex
+	alive   bool
+	aliveMu sync.Mutex
 
-	ack acks
+	ack *acks
 
 	server  *Server
 	address string
@@ -50,6 +60,7 @@ type Channel struct {
 // init the Channel
 func (c *Channel) init() {
 	c.outC, c.stubC, c.upgradedC = make(chan string, queueBufferSize), make(chan string), make(chan string)
+	c.ack = &acks{}
 	c.ack.ackC = make(map[int](chan string))
 	c.alive = true
 }
@@ -59,8 +70,8 @@ func (c *Channel) Id() string { return c.connHeader.Sid }
 
 // IsAlive checks that Channel is still alive
 func (c *Channel) IsAlive() bool {
-	c.aliveMutex.Lock()
-	defer c.aliveMutex.Unlock()
+	c.aliveMu.Lock()
+	defer c.aliveMu.Unlock()
 	return c.alive
 }
 
@@ -79,8 +90,8 @@ func (c *Channel) close(m *event) error {
 		logging.Log().Debug("close() type: WebsocketConnection")
 	}
 
-	c.aliveMutex.Lock()
-	defer c.aliveMutex.Unlock()
+	c.aliveMu.Lock()
+	defer c.aliveMu.Unlock()
 
 	if !c.alive { // already closed
 		return nil
@@ -101,9 +112,9 @@ func (c *Channel) close(m *event) error {
 		c.outC <- protocol.MessageStub
 	}
 
-	overfloodedMutex.Lock()
+	overfloodedMu.Lock()
 	delete(overflooded, c)
-	overfloodedMutex.Unlock()
+	overfloodedMu.Unlock()
 
 	return nil
 }
@@ -158,16 +169,6 @@ func (c *Channel) inLoop(m *event) error {
 	return nil
 }
 
-var overflooded = make(map[*Channel]struct{})
-var overfloodedMutex sync.Mutex
-
-// CountOverfloodingChannels returns an amount of overflooding channels
-func CountOverfloodingChannels() int {
-	overfloodedMutex.Lock()
-	defer overfloodedMutex.Unlock()
-	return len(overflooded)
-}
-
 // outLoop is an outgoing messages loop, sends messages from channel to socket
 func (c *Channel) outLoop(m *event) error {
 	for {
@@ -178,13 +179,13 @@ func (c *Channel) outLoop(m *event) error {
 			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
 			return c.close(m)
 		case outBufferLen > int(queueBufferSize/2):
-			overfloodedMutex.Lock()
+			overfloodedMu.Lock()
 			overflooded[c] = struct{}{}
-			overfloodedMutex.Unlock()
+			overfloodedMu.Unlock()
 		default:
-			overfloodedMutex.Lock()
+			overfloodedMu.Lock()
 			delete(overflooded, c)
-			overfloodedMutex.Unlock()
+			overfloodedMu.Unlock()
 		}
 
 		msg := <-c.outC
@@ -212,4 +213,140 @@ func (c *Channel) pingLoop() {
 
 		c.outC <- protocol.MessagePing
 	}
+}
+
+// send message packet to the given channel c with payload
+func (c *Channel) send(message *protocol.Message, payload interface{}) error {
+	// preventing encoding/json "index out of range" panic
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Log().Warn("socket.io send panic: ", r)
+		}
+	}()
+
+	if payload != nil {
+		b, err := json.Marshal(&payload)
+		if err != nil {
+			return err
+		}
+		message.Args = string(b)
+	}
+
+	command, err := protocol.Encode(message)
+	if err != nil {
+		return err
+	}
+
+	if len(c.outC) == queueBufferSize {
+		return ErrorSocketOverflood
+	}
+
+	c.outC <- command
+	return nil
+}
+
+// Emit an asynchronous handler with the given name and payload
+func (c *Channel) Emit(name string, payload interface{}) error {
+	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
+	return c.send(message, payload)
+}
+
+// Ack a synchronous handler with the given name and payload and wait for/receive the response
+func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
+	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.nextId(), Event: name}
+
+	ackC := make(chan string)
+	c.ack.register(msg.AckId, ackC)
+
+	if err := c.send(msg, payload); err != nil {
+		c.ack.unregister(msg.AckId)
+	}
+
+	select {
+	case result := <-ackC:
+		return result, nil
+	case <-time.After(timeout):
+		c.ack.unregister(msg.AckId)
+		return "", ErrorSendTimeout
+	}
+}
+
+// IP returns an IP of the socket client
+func (c *Channel) IP() string {
+	forward := c.RequestHeader().Get(HeaderForward)
+	if forward != "" {
+		return forward
+	}
+	return c.address
+}
+
+// RequestHeader returns a connection request connectionHeader
+func (c *Channel) RequestHeader() http.Header { return c.header }
+
+// Join this channel to the given room
+func (c *Channel) Join(room string) error {
+	if c.server == nil {
+		return ErrorServerNotSet
+	}
+
+	c.server.channelsMu.Lock()
+	defer c.server.channelsMu.Unlock()
+
+	if _, ok := c.server.channels[room]; !ok {
+		c.server.channels[room] = make(map[*Channel]struct{})
+	}
+
+	if _, ok := c.server.rooms[c]; !ok {
+		c.server.rooms[c] = make(map[string]struct{})
+	}
+
+	c.server.channels[room][c], c.server.rooms[c][room] = struct{}{}, struct{}{}
+	return nil
+}
+
+// Leave the given room (remove channel from it)
+func (c *Channel) Leave(room string) error {
+	if c.server == nil {
+		return ErrorServerNotSet
+	}
+
+	c.server.channelsMu.Lock()
+	defer c.server.channelsMu.Unlock()
+
+	if _, ok := c.server.channels[room]; ok {
+		delete(c.server.channels[room], c)
+		if len(c.server.channels[room]) == 0 {
+			delete(c.server.channels, room)
+		}
+	}
+
+	if _, ok := c.server.rooms[c]; ok {
+		delete(c.server.rooms[c], room)
+	}
+
+	return nil
+}
+
+// Amount returns an amount of channels joined to the given room, using channel
+func (c *Channel) Amount(room string) int {
+	if c.server == nil {
+		return 0
+	}
+	return c.server.Amount(room)
+}
+
+// List returns a list of channels joined to the given room, using channel
+func (c *Channel) List(room string) []*Channel {
+	if c.server == nil {
+		return []*Channel{}
+	}
+	return c.server.List(room)
+}
+
+// BroadcastTo the the given room an handler with payload, using channel
+func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
+	if c.server == nil {
+		return
+	}
+	c.server.BroadcastTo(room, event, payload)
 }

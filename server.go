@@ -17,10 +17,6 @@ import (
 	"github.com/mtfelian/golang-socketio/transport"
 )
 
-const (
-	HeaderForward = "X-Forwarded-For"
-)
-
 var (
 	ErrorServerNotSet       = errors.New("server was not set")
 	ErrorConnectionNotFound = errors.New("connection not found")
@@ -59,18 +55,6 @@ func NewServer() *Server {
 	return s
 }
 
-// IP returns an IP of the socket client
-func (c *Channel) IP() string {
-	forward := c.RequestHeader().Get(HeaderForward)
-	if forward != "" {
-		return forward
-	}
-	return c.address
-}
-
-// RequestHeader returns a connection request connectionHeader
-func (c *Channel) RequestHeader() http.Header { return c.header }
-
 // GetChannel by it's sid
 func (s *Server) GetChannel(sid string) (*Channel, error) {
 	s.sidsMu.RLock()
@@ -84,72 +68,12 @@ func (s *Server) GetChannel(sid string) (*Channel, error) {
 	return c, nil
 }
 
-// Join this channel to the given room
-func (c *Channel) Join(room string) error {
-	if c.server == nil {
-		return ErrorServerNotSet
-	}
-
-	c.server.channelsMu.Lock()
-	defer c.server.channelsMu.Unlock()
-
-	if _, ok := c.server.channels[room]; !ok {
-		c.server.channels[room] = make(map[*Channel]struct{})
-	}
-
-	if _, ok := c.server.rooms[c]; !ok {
-		c.server.rooms[c] = make(map[string]struct{})
-	}
-
-	c.server.channels[room][c], c.server.rooms[c][room] = struct{}{}, struct{}{}
-	return nil
-}
-
-// Leave the given room (remove channel from it)
-func (c *Channel) Leave(room string) error {
-	if c.server == nil {
-		return ErrorServerNotSet
-	}
-
-	c.server.channelsMu.Lock()
-	defer c.server.channelsMu.Unlock()
-
-	if _, ok := c.server.channels[room]; ok {
-		delete(c.server.channels[room], c)
-		if len(c.server.channels[room]) == 0 {
-			delete(c.server.channels, room)
-		}
-	}
-
-	if _, ok := c.server.rooms[c]; ok {
-		delete(c.server.rooms[c], room)
-	}
-
-	return nil
-}
-
-// Amount returns an amount of channels joined to the given room, using channel
-func (c *Channel) Amount(room string) int {
-	if c.server == nil {
-		return 0
-	}
-	return c.server.Amount(room)
-}
-
 // Get amount of channels, joined to given room, using server
 func (s *Server) Amount(room string) int {
 	s.channelsMu.RLock()
 	defer s.channelsMu.RUnlock()
 	roomChannels, _ := s.channels[room]
 	return len(roomChannels)
-}
-
-// List returns a list of channels joined to the given room, using channel
-func (c *Channel) List(room string) []*Channel {
-	if c.server == nil {
-		return []*Channel{}
-	}
-	return c.server.List(room)
 }
 
 // List returns a list of channels joined to the given room, using server
@@ -170,14 +94,6 @@ func (s *Server) List(room string) []*Channel {
 	}
 
 	return roomChannelsCopy
-}
-
-// BroadcastTo the the given room an handler with payload, using channel
-func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
-	if c.server == nil {
-		return
-	}
-	c.server.BroadcastTo(room, event, payload)
 }
 
 // BroadcastTo the the given room an handler with payload, using server
