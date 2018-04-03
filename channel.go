@@ -34,11 +34,6 @@ type connectionHeader struct {
 }
 
 // Channel represents socket.io connection
-// use IsAlive to check that handler is still working
-// use Dial to connect via the chosen transport
-// use In and Out channels for message exchange
-// Close message means channel is closed
-// ping is automatic
 type Channel struct {
 	conn transport.Connection
 
@@ -61,7 +56,7 @@ type Channel struct {
 func (c *Channel) init() {
 	c.outC, c.stubC, c.upgradedC = make(chan string, queueBufferSize), make(chan string), make(chan string)
 	c.ack = &acks{}
-	c.ack.ackC = make(map[int](chan string))
+	c.ack.ackC = make(map[int]chan string)
 	c.alive = true
 }
 
@@ -82,7 +77,7 @@ func (c *Channel) Close() error { return c.close(c.server.event) }
 func (c *Channel) stub() error { return c.close(nil) }
 
 // close channel
-func (c *Channel) close(m *event) error {
+func (c *Channel) close(e *event) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
 		logging.Log().Debug("close() type: PollingConnection")
@@ -105,9 +100,9 @@ func (c *Channel) close(m *event) error {
 		<-c.outC
 	}
 
-	if m != nil { // close
+	if e != nil { // close
 		c.outC <- protocol.MessageClose
-		m.callLoopEvent(c, OnDisconnection)
+		e.callLoopEvent(c, OnDisconnection)
 	} else { // stub at transport upgrade
 		c.outC <- protocol.MessageStub
 	}
@@ -119,13 +114,13 @@ func (c *Channel) close(m *event) error {
 	return nil
 }
 
-// inLoop is an incoming messages loop
-func (c *Channel) inLoop(m *event) error {
+// inLoop is an incoming events loop
+func (c *Channel) inLoop(e *event) error {
 	for {
 		message, err := c.conn.GetMessage()
 		if err != nil {
 			logging.Log().Debugf("inLoop(), c.conn.GetMessage() err: %v, message: %s", err, message)
-			return c.close(m)
+			return c.close(e)
 		}
 
 		if message == transport.StopMessage {
@@ -136,7 +131,7 @@ func (c *Channel) inLoop(m *event) error {
 		decodedMessage, err := protocol.Decode(message)
 		if err != nil {
 			logging.Log().Debugf("inLoop() decoding err: %v, message: %s", err, message)
-			c.close(m)
+			c.close(e)
 			return err
 		}
 
@@ -144,9 +139,9 @@ func (c *Channel) inLoop(m *event) error {
 		case protocol.MessageTypeOpen:
 			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen: %+v", decodedMessage)
 			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.connHeader); err != nil {
-				c.close(m)
+				c.close(e)
 			}
-			m.callLoopEvent(c, OnConnection)
+			e.callLoopEvent(c, OnConnection)
 
 		case protocol.MessageTypePing:
 			logging.Log().Debugf("inLoop(), protocol.MessageTypePing: %+v", decodedMessage)
@@ -162,22 +157,22 @@ func (c *Channel) inLoop(m *event) error {
 		case protocol.MessageTypeBlank:
 		case protocol.MessageTypePong:
 		default:
-			go m.processIncomingEvent(c, decodedMessage)
+			go e.processIncomingEvent(c, decodedMessage)
 		}
 	}
 
 	return nil
 }
 
-// outLoop is an outgoing messages loop, sends messages from channel to socket
-func (c *Channel) outLoop(m *event) error {
+// outLoop is an outgoing events loop, sends messages from channel to socket
+func (c *Channel) outLoop(e *event) error {
 	for {
 		outBufferLen := len(c.outC)
 		logging.Log().Debug("outLoop(), outBufferLen: ", outBufferLen)
 		switch {
 		case outBufferLen >= queueBufferSize-1:
 			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
-			return c.close(m)
+			return c.close(e)
 		case outBufferLen > int(queueBufferSize/2):
 			overfloodedMu.Lock()
 			overflooded[c] = struct{}{}
@@ -196,7 +191,7 @@ func (c *Channel) outLoop(m *event) error {
 
 		if err := c.conn.WriteMessage(msg); err != nil {
 			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage(), err: ", err)
-			return c.close(m)
+			return c.close(e)
 		}
 	}
 	return nil
@@ -216,7 +211,7 @@ func (c *Channel) pingLoop() {
 }
 
 // send message packet to the given channel c with payload
-func (c *Channel) send(message *protocol.Message, payload interface{}) error {
+func (c *Channel) send(m *protocol.Message, payload interface{}) error {
 	// preventing encoding/json "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -229,10 +224,10 @@ func (c *Channel) send(message *protocol.Message, payload interface{}) error {
 		if err != nil {
 			return err
 		}
-		message.Args = string(b)
+		m.Args = string(b)
 	}
 
-	command, err := protocol.Encode(message)
+	command, err := protocol.Encode(m)
 	if err != nil {
 		return err
 	}
@@ -245,13 +240,13 @@ func (c *Channel) send(message *protocol.Message, payload interface{}) error {
 	return nil
 }
 
-// Emit an asynchronous handler with the given name and payload
+// Emit an asynchronous event with the given name and payload
 func (c *Channel) Emit(name string, payload interface{}) error {
 	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
 	return c.send(message, payload)
 }
 
-// Ack a synchronous handler with the given name and payload and wait for/receive the response
+// Ack a synchronous event with the given name and payload and wait for/receive the response
 func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
 	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.nextId(), Event: name}
 
@@ -343,10 +338,10 @@ func (c *Channel) List(room string) []*Channel {
 	return c.server.List(room)
 }
 
-// BroadcastTo the the given room an handler with payload, using channel
-func (c *Channel) BroadcastTo(room, event string, payload interface{}) {
+// BroadcastTo the the given room an event with given name and payload, using channel
+func (c *Channel) BroadcastTo(room, name string, payload interface{}) {
 	if c.server == nil {
 		return
 	}
-	c.server.BroadcastTo(room, event, payload)
+	c.server.BroadcastTo(room, name, payload)
 }

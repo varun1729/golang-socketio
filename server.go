@@ -97,7 +97,7 @@ func (s *Server) List(room string) []*Channel {
 }
 
 // BroadcastTo the the given room an handler with payload, using server
-func (s *Server) BroadcastTo(room, method string, payload interface{}) {
+func (s *Server) BroadcastTo(room, name string, payload interface{}) {
 	s.channelsMu.RLock()
 	defer s.channelsMu.RUnlock()
 
@@ -108,7 +108,7 @@ func (s *Server) BroadcastTo(room, method string, payload interface{}) {
 
 	for cn := range roomChannels {
 		if cn.IsAlive() {
-			go cn.Emit(method, payload)
+			go cn.Emit(name, payload)
 		}
 	}
 }
@@ -201,17 +201,17 @@ func (s *Server) setupEventLoop(conn transport.Connection, address string, heade
 	s.callLoopEvent(c, OnConnection)
 }
 
-// setupUpgradeEventLoop for connection upgrading
-func (s *Server) setupUpgradeEventLoop(conn transport.Connection, remoteAddr string, header http.Header, sid string) {
-	logging.Log().Debug("setupUpgradeEventLoop(): entered")
+// upgradeEventLoop at transport upgrade
+func (s *Server) upgradeEventLoop(conn transport.Connection, remoteAddr string, header http.Header, sid string) {
+	logging.Log().Debug("upgradeEventLoop(): entered")
 
 	cPolling, err := s.GetChannel(sid)
 	if err != nil {
-		logging.Log().Warnf("setupUpgradeEventLoop() can't find channel for session %s", sid)
+		logging.Log().Warnf("upgradeEventLoop() can't find channel for session %s", sid)
 		return
 	}
 
-	logging.Log().Debug("setupUpgradeEventLoop() obtained channel")
+	logging.Log().Debug("upgradeEventLoop() obtained channel")
 	interval, timeout := conn.PingParams()
 	connHeader := connectionHeader{
 		Sid:          sid,
@@ -222,12 +222,12 @@ func (s *Server) setupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 
 	c := &Channel{conn: conn, address: remoteAddr, header: header, server: s, connHeader: connHeader}
 	c.init()
-	logging.Log().Debug("setupUpgradeEventLoop init channel")
+	logging.Log().Debug("upgradeEventLoop init channel")
 
 	go c.inLoop(s.event)
 	go c.outLoop(s.event)
 
-	logging.Log().Debug("setupUpgradeEventLoop go loops")
+	logging.Log().Debug("upgradeEventLoop go loops")
 	onConnection(c)
 
 	// synchronize stubbing polling channel with receiving "2probe" message
@@ -238,6 +238,12 @@ func (s *Server) setupUpgradeEventLoop(conn transport.Connection, remoteAddr str
 // ServeHTTP makes Server to implement http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, transportName := r.URL.Query().Get("sid"), r.URL.Query().Get("transport")
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers",
+		"Origin,X-Requested-With,Content-Type,Accept,content-type,application/json,Authorization")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 	switch transportName {
 	case "polling":
@@ -264,7 +270,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				logging.Log().Debug("upgrade error ", err)
 				return
 			}
-			s.setupUpgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
+			s.upgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
 			logging.Log().Debug("WebsocketConnection upgraded")
 			return
 		}
