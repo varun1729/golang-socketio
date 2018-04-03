@@ -41,8 +41,8 @@ type Server struct {
 // NewServer creates new socket.io server
 func NewServer() *Server {
 	s := &Server{
-		websocket: transport.GetDefaultWebsocketTransport(),
-		polling:   transport.GetDefaultPollingTransport(),
+		websocket: transport.DefaultWebsocketTransport(),
+		polling:   transport.DefaultPollingTransport(),
 		channels:  make(map[string]map[*Channel]struct{}),
 		rooms:     make(map[*Channel]map[string]struct{}),
 		sids:      make(map[string]*Channel),

@@ -77,8 +77,8 @@ func (plc *PollingClientConnection) WriteMessage(message string) error {
 	return nil
 }
 
-func (plc *PollingClientConnection) Close() {
-	plc.WriteMessage(protocol.MessageClose)
+func (plc *PollingClientConnection) Close() error {
+	return plc.WriteMessage(protocol.MessageClose)
 }
 
 func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
@@ -167,8 +167,8 @@ func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
 	return nil, errors.New("Not open message answer")
 }
 
-// Returns polling transport with default params
-func GetDefaultPollingClientTransport() *PollingClientTransport {
+// DefaultPollingClientTransport returns client polling transport with default params
+func DefaultPollingClientTransport() *PollingClientTransport {
 	return &PollingClientTransport{
 		PingInterval:   PlDefaultPingInterval,
 		PingTimeout:    PlDefaultPingTimeout,

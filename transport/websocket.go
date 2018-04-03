@@ -13,32 +13,32 @@ import (
 const (
 	upgradeFailed = "Upgrade failed: "
 
-	WsDefaultPingInterval   = 30 * time.Second
-	WsDefaultPingTimeout    = 60 * time.Second
-	WsDefaultReceiveTimeout = 60 * time.Second
-	WsDefaultSendTimeout    = 60 * time.Second
-	WsDefaultBufferSize     = 1024 * 32
+	wsDefaultPingInterval   = 30 * time.Second
+	wsDefaultPingTimeout    = 60 * time.Second
+	wsDefaultReceiveTimeout = 60 * time.Second
+	wsDefaultSendTimeout    = 60 * time.Second
+	wsDefaultBufferSize     = 1024 * 32
 )
 
 // WebsocketTransportParams is a parameters for getting non-default websocket transport
-type WebsocketTransportParams struct {
-	Headers http.Header
-}
+type WebsocketTransportParams struct{ Headers http.Header }
 
 var (
-	ErrorBinaryMessage     = errors.New("Binary messages are not supported")
-	ErrorBadBuffer         = errors.New("Buffer error")
-	ErrorPacketWrong       = errors.New("Wrong packet type error")
-	ErrorMethodNotAllowed  = errors.New("Method not allowed")
-	ErrorHttpUpgradeFailed = errors.New("Http upgrade failed")
+	errBinaryMessage     = errors.New("binary messages are not supported")
+	errBadBuffer         = errors.New("buffer error")
+	errPacketWrong       = errors.New("wrong packet type error")
+	errMethodNotAllowed  = errors.New("method not allowed")
+	errHttpUpgradeFailed = errors.New("http upgrade failed")
 )
 
+// WebsocketConnection represents websocket connection
 type WebsocketConnection struct {
 	socket    *websocket.Conn
 	transport *WebsocketTransport
 }
 
-func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
+// GetMessage from the connection
+func (wsc *WebsocketConnection) GetMessage() (string, error) {
 	logging.Log().Debug("GetMessage ws begin")
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
 
@@ -48,32 +48,34 @@ func (wsc *WebsocketConnection) GetMessage() (message string, err error) {
 		return "", err
 	}
 
-	//support only text messages exchange
+	// supports only text messages exchange
 	if msgType != websocket.TextMessage {
 		logging.Log().Debug("ws reading err ErrorBinaryMessage")
-		return "", ErrorBinaryMessage
+		return "", errBinaryMessage
 	}
 
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		logging.Log().Debug("ws reading err ErrorBadBuffer")
-		return "", ErrorBadBuffer
+		return "", errBadBuffer
 	}
 
 	text := string(data)
 	logging.Log().Debug("GetMessage ws text ", text)
 
-	//empty messages are not allowed
+	// empty messages are not allowed
 	if len(text) == 0 {
 		logging.Log().Debug("ws reading err ErrorPacketWrong")
-		return "", ErrorPacketWrong
+		return "", errPacketWrong
 	}
 
 	return text, nil
 }
 
-func (wsc *WebsocketTransport) SetSid(sid string, conn Connection) {}
+// SetSid does nothing for the websocket transport, it's used only when transport changes (from)
+func (wsc *WebsocketTransport) SetSid(string, Connection) {}
 
+// WriteMessage message into a connection
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	logging.Log().Debug("WriteMessage ws ", message)
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
@@ -90,15 +92,18 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 	return writer.Close()
 }
 
-func (wsc *WebsocketConnection) Close() {
+// Close the connection
+func (wsc *WebsocketConnection) Close() error {
 	logging.Log().Debug("ws close")
-	wsc.socket.Close()
+	return wsc.socket.Close()
 }
 
+// PingParams returns ping params
 func (wsc *WebsocketConnection) PingParams() (time.Duration, time.Duration) {
 	return wsc.transport.PingInterval, wsc.transport.PingTimeout
 }
 
+// WebsocketTransport implements websocket transport
 type WebsocketTransport struct {
 	PingInterval   time.Duration
 	PingTimeout    time.Duration
@@ -106,10 +111,10 @@ type WebsocketTransport struct {
 	SendTimeout    time.Duration
 
 	BufferSize int
-
-	Headers http.Header
+	Headers    http.Header
 }
 
+// Connect to the given url
 func (wst *WebsocketTransport) Connect(url string) (Connection, error) {
 	dialer := websocket.Dialer{}
 	socket, _, err := dialer.Dial(url, wst.Headers)
@@ -120,41 +125,44 @@ func (wst *WebsocketTransport) Connect(url string) (Connection, error) {
 	return &WebsocketConnection{socket, wst}, nil
 }
 
+// HandleConnection
 func (wst *WebsocketTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
-
 	if r.Method != http.MethodGet {
-		http.Error(w, upgradeFailed+ErrorMethodNotAllowed.Error(), 503)
-		return nil, ErrorMethodNotAllowed
+		http.Error(w, upgradeFailed+errMethodNotAllowed.Error(), http.StatusServiceUnavailable)
+		return nil, errMethodNotAllowed
 	}
 
-	socket, err := websocket.Upgrade(w, r, nil, wst.BufferSize, wst.BufferSize)
+	socket, err := (&websocket.Upgrader{
+		ReadBufferSize:  wst.BufferSize,
+		WriteBufferSize: wst.BufferSize,
+	}).Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, upgradeFailed+err.Error(), 503)
-		return nil, ErrorHttpUpgradeFailed
+		return nil, errHttpUpgradeFailed
 	}
 
 	return &WebsocketConnection{socket, wst}, nil
 }
 
-// Websocket connection do not require any additional processing
+// Serve does nothing here. Websocket connection does not require any additional processing
 func (wst *WebsocketTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 
-// Returns websocket connection with default params
-func GetDefaultWebsocketTransport() *WebsocketTransport {
+// DefaultWebsocketTransport returns websocket connection with default params
+func DefaultWebsocketTransport() *WebsocketTransport {
 	return &WebsocketTransport{
-		PingInterval:   WsDefaultPingInterval,
-		PingTimeout:    WsDefaultPingTimeout,
-		ReceiveTimeout: WsDefaultReceiveTimeout,
-		SendTimeout:    WsDefaultSendTimeout,
-		BufferSize:     WsDefaultBufferSize,
+		PingInterval:   wsDefaultPingInterval,
+		PingTimeout:    wsDefaultPingTimeout,
+		ReceiveTimeout: wsDefaultReceiveTimeout,
+		SendTimeout:    wsDefaultSendTimeout,
 
-		Headers: nil,
+		BufferSize: wsDefaultBufferSize,
+		Headers:    nil,
 	}
 }
 
-// GetWebsocketTransport returns websocket transport with additional params
-func GetWebsocketTransport(params WebsocketTransportParams) *WebsocketTransport {
-	tr := GetDefaultWebsocketTransport()
+// NewWebsocketTransport returns websocket transport with given params
+func NewWebsocketTransport(params WebsocketTransportParams) *WebsocketTransport {
+	tr := DefaultWebsocketTransport()
 	tr.Headers = params.Headers
 	return tr
 }

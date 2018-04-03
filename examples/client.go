@@ -34,7 +34,7 @@ func main() {
 	//fmt.Println(gosocketio.AddrWebsocket("localhost", 3811, false))
 	c, err := gosocketio.Dial(
 		gosocketio.AddrPolling("localhost", 3811, false),
-		transport.GetDefaultPollingClientTransport())
+		transport.DefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func main() {
 	/*c.Close()
 	c, err = gosocketio.Dial(
 		gosocketio.AddrPolling("localhost", 3811, false),
-		transport.GetDefaultPollingClientTransport())
+		transport.DefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
 	}*/
@@ -62,7 +62,7 @@ func main() {
 
 	c, err = gosocketio.Dial(
 		gosocketio.AddrPolling("localhost", 3811, false),
-		transport.GetDefaultPollingClientTransport())
+		transport.DefaultPollingClientTransport())
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -69,10 +69,11 @@ func (plc *PollingConnection) WriteMessage(message string) error {
 	return nil
 }
 
-func (plc *PollingConnection) Close() {
+func (plc *PollingConnection) Close() error {
 	logging.Log().Debug("PollingConnection close ", plc.sid)
-	plc.WriteMessage("6")
+	err := plc.WriteMessage("6")
 	plc.Transport.sessions.Delete(plc.sid)
+	return err
 }
 
 func (plc *PollingConnection) PingParams() (time.Duration, time.Duration) {
@@ -173,8 +174,8 @@ func (plt *PollingTransport) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Returns polling transport with default params
-func GetDefaultPollingTransport() *PollingTransport {
+// DefaultPollingTransport returns polling transport with default params
+func DefaultPollingTransport() *PollingTransport {
 	return &PollingTransport{
 		PingInterval:   PlDefaultPingInterval,
 		PingTimeout:    PlDefaultPingTimeout,
