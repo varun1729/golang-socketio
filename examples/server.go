@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gin-gonic/gin"
 	"github.com/mtfelian/golang-socketio"
 	_ "github.com/mtfelian/golang-socketio/transport"
+
 	"github.com/mtfelian/utils"
 )
 
@@ -68,13 +68,13 @@ func main() {
 		return "another param:" + param
 	})
 
-	router := gin.Default()
-	router.Handle("GET", "/socket.io/", func(c *gin.Context) { server.ServeHTTP(c.Writer, c.Request) })
-	router.Handle("POST", "/socket.io/", func(c *gin.Context) { server.ServeHTTP(c.Writer, c.Request) })
-	router.Any("/", gin.WrapF(AssetsFileHandler))
+	serveMux := http.NewServeMux()
+	serveMux.Handle("/socket.io/", server)
+
+	serveMux.HandleFunc("/", AssetsFileHandler)
 
 	log.Println("Starting server...")
-	log.Panic(router.Run("localhost:3811"))
+	log.Panic(http.ListenAndServe(":3811", serveMux))
 }
 
 func AssetsFileHandler(w http.ResponseWriter, r *http.Request) {
