@@ -239,12 +239,6 @@ func (s *Server) upgradeEventLoop(conn transport.Connection, remoteAddr string, 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	session, transportName := r.URL.Query().Get("sid"), r.URL.Query().Get("transport")
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	w.Header().Set("Access-Control-Allow-Headers",
-		"Origin,X-Requested-With,Content-Type,Accept,content-type,application/json,Authorization")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-
 	switch transportName {
 	case "polling":
 		// session is empty in first polling request, or first and single websocket request
