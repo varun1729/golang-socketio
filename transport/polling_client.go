@@ -92,7 +92,7 @@ type PollingClientTransport struct {
 	SendTimeout    time.Duration
 
 	Headers  http.Header
-	sessions sessionMap
+	sessions sessions
 }
 
 func (plt *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
