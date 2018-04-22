@@ -39,33 +39,33 @@ type WebsocketConnection struct {
 
 // GetMessage from the connection
 func (wsc *WebsocketConnection) GetMessage() (string, error) {
-	logging.Log().Debug("GetMessage ws begin")
+	logging.Log().Debug("WebsocketConnection.GetMessage() fired")
 	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
 
 	msgType, reader, err := wsc.socket.NextReader()
 	if err != nil {
-		logging.Log().Debug("ws reading err ", err)
+		logging.Log().Debug("WebsocketConnection.GetMessage() wsc.socket.NextReader() err:", err)
 		return "", err
 	}
 
 	// supports only text messages exchange
 	if msgType != websocket.TextMessage {
-		logging.Log().Debug("ws reading err ErrorBinaryMessage")
+		logging.Log().Debug("WebsocketConnection.GetMessage() returns errBinaryMessage")
 		return "", errBinaryMessage
 	}
 
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
-		logging.Log().Debug("ws reading err ErrorBadBuffer")
+		logging.Log().Debug("WebsocketConnection.GetMessage() returns errBadBuffer")
 		return "", errBadBuffer
 	}
 
 	text := string(data)
-	logging.Log().Debug("GetMessage ws text ", text)
+	logging.Log().Debug("WebsocketConnection.GetMessage() text:", text)
 
 	// empty messages are not allowed
 	if len(text) == 0 {
-		logging.Log().Debug("ws reading err ErrorPacketWrong")
+		logging.Log().Debug("WebsocketConnection.GetMessage() returns errPacketWrong")
 		return "", errPacketWrong
 	}
 
@@ -77,7 +77,7 @@ func (wsc *WebsocketTransport) SetSid(string, Connection) {}
 
 // WriteMessage message into a connection
 func (wsc *WebsocketConnection) WriteMessage(message string) error {
-	logging.Log().Debug("WriteMessage ws ", message)
+	logging.Log().Debug("WebsocketConnection.WriteMessage() fired with:", message)
 	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
 
 	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
@@ -94,7 +94,7 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 
 // Close the connection
 func (wsc *WebsocketConnection) Close() error {
-	logging.Log().Debug("ws close")
+	logging.Log().Debug("WebsocketConnection.Close() fired")
 	return wsc.socket.Close()
 }
 
@@ -137,7 +137,7 @@ func (wst *WebsocketTransport) HandleConnection(w http.ResponseWriter, r *http.R
 		WriteBufferSize: wst.BufferSize,
 	}).Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, upgradeFailed+err.Error(), 503)
+		http.Error(w, upgradeFailed+err.Error(), http.StatusServiceUnavailable)
 		return nil, errHttpUpgradeFailed
 	}
 
@@ -156,7 +156,6 @@ func DefaultWebsocketTransport() *WebsocketTransport {
 		SendTimeout:    wsDefaultSendTimeout,
 
 		BufferSize: wsDefaultBufferSize,
-		Headers:    nil,
 	}
 }
 
