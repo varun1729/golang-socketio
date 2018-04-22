@@ -14,6 +14,12 @@ import (
 	"github.com/mtfelian/golang-socketio/protocol"
 )
 
+var (
+	errResponseIsNotOK       = errors.New("response body is not OK")
+	errAnswerNotOpenSequence = errors.New("not opensequence answer")
+	errAnswerNotOpenMessage  = errors.New("not openmessage answer")
+)
+
 // PollingClientConnection represents XHR polling client connection
 type PollingClientConnection struct {
 	transport *PollingClientTransport
@@ -23,23 +29,23 @@ type PollingClientConnection struct {
 }
 
 // GetMessage performs a GET request to wait for the following message
-func (plc *PollingClientConnection) GetMessage() (string, error) {
-	logging.Log().Debug("Get request sent")
+func (polling *PollingClientConnection) GetMessage() (string, error) {
+	logging.Log().Debug("PollingConnection.GetMessage() fired")
 
-	resp, err := plc.client.Get(plc.url)
+	resp, err := polling.client.Get(polling.url)
 	if err != nil {
-		logging.Log().Debug("error from plc.client.Get():", err)
+		logging.Log().Debug("PollingConnection.GetMessage() error polling.client.Get():", err)
 		return "", err
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logging.Log().Debug("error in GetMessage, reading resp.Body:", err)
+		logging.Log().Debug("PollingConnection.GetMessage() error ioutil.ReadAll():", err)
 		return "", err
 	}
 
 	bodyString := string(bodyBytes)
-	logging.Log().Debug("bodyString:", bodyString)
+	logging.Log().Debug("PollingConnection.GetMessage() bodyString:", bodyString)
 	index := strings.Index(bodyString, ":")
 
 	body := bodyString[index+1:]
@@ -47,40 +53,40 @@ func (plc *PollingClientConnection) GetMessage() (string, error) {
 }
 
 // WriteMessage performs a POST request to send a message to server
-func (plc *PollingClientConnection) WriteMessage(message string) error {
+func (polling *PollingClientConnection) WriteMessage(message string) error {
 	msgToWrite := strconv.Itoa(len(message)) + ":" + message
-	logging.Log().Debug("write msg: ", msgToWrite)
+	logging.Log().Debug("PollingConnection.WriteMessage() fired, msgToWrite:", msgToWrite)
 	var jsonStr = []byte(msgToWrite)
 
-	resp, err := plc.client.Post(plc.url, "application/json", bytes.NewBuffer(jsonStr))
+	resp, err := polling.client.Post(polling.url, "application/json", bytes.NewBuffer(jsonStr))
 	if err != nil {
-		logging.Log().Debug("error from pcl.Client.Post():", err)
+		logging.Log().Debug("PollingConnection.WriteMessage() error polling.client.Post():", err)
 		return err
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logging.Log().Debug("error in WriteMessage(), reading resp.Body:", err)
+		logging.Log().Debug("PollingConnection.WriteMessage() error ioutil.ReadAll():", err)
 		return err
 	}
 
 	resp.Body.Close()
 	bodyString := string(bodyBytes)
 	if bodyString != "ok" {
-		return errors.New("message post result is not OK")
+		return errResponseIsNotOK
 	}
 
 	return nil
 }
 
 // Close the client connection gracefully
-func (plc *PollingClientConnection) Close() error {
-	return plc.WriteMessage(protocol.MessageClose)
+func (polling *PollingClientConnection) Close() error {
+	return polling.WriteMessage(protocol.MessageClose)
 }
 
 // PingParams returns PingInterval and PingTimeout params
-func (plc *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
-	return plc.transport.PingInterval, plc.transport.PingTimeout
+func (polling *PollingClientConnection) PingParams() (time.Duration, time.Duration) {
+	return polling.transport.PingInterval, polling.transport.PingTimeout
 }
 
 // PollingClientTransport represents polling client transport parameters
@@ -95,15 +101,15 @@ type PollingClientTransport struct {
 }
 
 // HandleConnection for the polling client is a placeholder
-func (plt *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
+func (t *PollingClientTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	return nil, nil
 }
 
 // Serve for the polling client is a placeholder
-func (plt *PollingClientTransport) Serve(w http.ResponseWriter, r *http.Request) {}
+func (t *PollingClientTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 
 // SetSid for the polling client is a placeholder
-func (plt *PollingClientTransport) SetSid(sid string, conn Connection) {}
+func (t *PollingClientTransport) SetSid(sid string, conn Connection) {}
 
 // openSequence represents a connection open sequence parameters
 type openSequence struct {
@@ -114,66 +120,63 @@ type openSequence struct {
 }
 
 // Connect to server, perform 3 HTTP requests in connecting sequence
-func (plt *PollingClientTransport) Connect(url string) (Connection, error) {
-	plc := &PollingClientConnection{transport: plt, client: &http.Client{}, url: url}
+func (t *PollingClientTransport) Connect(url string) (Connection, error) {
+	polling := &PollingClientConnection{transport: t, client: &http.Client{}, url: url}
 
-	resp, err := plc.client.Get(plc.url)
+	resp, err := polling.client.Get(polling.url)
 	if err != nil {
-		logging.Log().Debug("error from plc.client.Get:", err)
+		logging.Log().Debug("PollingConnection.Connect() error polling.client.Get() 1:", err)
 		return nil, err
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logging.Log().Debug("error from Connect() reading resp.Body:", err)
+		logging.Log().Debug("PollingConnection.Connect() error ioutil.ReadAll() 1:", err)
 		return nil, err
 	}
 
 	resp.Body.Close()
 	bodyString := string(bodyBytes)
-	logging.Log().Debug("bodyString:", bodyString)
+	logging.Log().Debug("PollingConnection.Connect() bodyString 1:", bodyString)
 
-	index := strings.Index(bodyString, ":")
-	body := bodyString[index+1:]
-	if string(body[0]) == protocol.MessageOpen {
-		bodyBytes2 := []byte(body[1:])
-		var openSequence openSequence
-
-		if err := json.Unmarshal(bodyBytes2, &openSequence); err != nil {
-			logging.Log().Debug("json.Unmarshal() err in Connect():", err)
-			return nil, err
-		}
-
-		plc.url += "&sid=" + openSequence.Sid
-		logging.Log().Debug("plc.url:", plc.url)
-	} else {
-		return nil, errors.New("Not opensequence answer")
+	body := bodyString[strings.Index(bodyString, ":")+1:]
+	if string(body[0]) != protocol.MessageOpen {
+		return nil, errAnswerNotOpenSequence
 	}
 
-	resp, err = plc.client.Get(plc.url)
+	bodyBytes2 := []byte(body[1:])
+	var openSequence openSequence
+
+	if err := json.Unmarshal(bodyBytes2, &openSequence); err != nil {
+		logging.Log().Debug("PollingConnection.Connect() error json.Unmarshal() 1:", err)
+		return nil, err
+	}
+
+	polling.url += "&sid=" + openSequence.Sid
+	logging.Log().Debug("PollingConnection.Connect() polling.url 1:", polling.url)
+
+	resp, err = polling.client.Get(polling.url)
 	if err != nil {
-		logging.Log().Debug("error in get client: ", err)
+		logging.Log().Debug("PollingConnection.Connect() error plc.client.Get() 2:", err)
 		return nil, err
 	}
 
 	bodyBytes, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logging.Log()
-		logging.Log().Debug("error read resp body: ", err)
+		logging.Log().Debug("PollingConnection.Connect() error ioutil.ReadAll() 2:", err)
 		return nil, err
 	}
 
 	resp.Body.Close()
 	bodyString = string(bodyBytes)
-	logging.Log().Debug("bodyString: ", bodyString)
-	index = strings.Index(bodyString, ":")
-	body = bodyString[index+1:]
+	logging.Log().Debug("PollingConnection.Connect() bodyString 2:", bodyString)
+	body = bodyString[strings.Index(bodyString, ":")+1:]
 
-	if body == protocol.MessageEmpty {
-		return plc, nil
+	if body != protocol.MessageEmpty {
+		return nil, errAnswerNotOpenMessage
 	}
 
-	return nil, errors.New("Not open message answer")
+	return polling, nil
 }
 
 // DefaultPollingClientTransport returns client polling transport with default params

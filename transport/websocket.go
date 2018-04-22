@@ -38,13 +38,13 @@ type WebsocketConnection struct {
 }
 
 // GetMessage from the connection
-func (wsc *WebsocketConnection) GetMessage() (string, error) {
+func (ws *WebsocketConnection) GetMessage() (string, error) {
 	logging.Log().Debug("WebsocketConnection.GetMessage() fired")
-	wsc.socket.SetReadDeadline(time.Now().Add(wsc.transport.ReceiveTimeout))
+	ws.socket.SetReadDeadline(time.Now().Add(ws.transport.ReceiveTimeout))
 
-	msgType, reader, err := wsc.socket.NextReader()
+	msgType, reader, err := ws.socket.NextReader()
 	if err != nil {
-		logging.Log().Debug("WebsocketConnection.GetMessage() wsc.socket.NextReader() err:", err)
+		logging.Log().Debug("WebsocketConnection.GetMessage() ws.socket.NextReader() err:", err)
 		return "", err
 	}
 
@@ -73,14 +73,14 @@ func (wsc *WebsocketConnection) GetMessage() (string, error) {
 }
 
 // SetSid does nothing for the websocket transport, it's used only when transport changes (from)
-func (wsc *WebsocketTransport) SetSid(string, Connection) {}
+func (t *WebsocketTransport) SetSid(string, Connection) {}
 
 // WriteMessage message into a connection
-func (wsc *WebsocketConnection) WriteMessage(message string) error {
+func (ws *WebsocketConnection) WriteMessage(message string) error {
 	logging.Log().Debug("WebsocketConnection.WriteMessage() fired with:", message)
-	wsc.socket.SetWriteDeadline(time.Now().Add(wsc.transport.SendTimeout))
+	ws.socket.SetWriteDeadline(time.Now().Add(ws.transport.SendTimeout))
 
-	writer, err := wsc.socket.NextWriter(websocket.TextMessage)
+	writer, err := ws.socket.NextWriter(websocket.TextMessage)
 	if err != nil {
 		return err
 	}
@@ -93,14 +93,14 @@ func (wsc *WebsocketConnection) WriteMessage(message string) error {
 }
 
 // Close the connection
-func (wsc *WebsocketConnection) Close() error {
+func (ws *WebsocketConnection) Close() error {
 	logging.Log().Debug("WebsocketConnection.Close() fired")
-	return wsc.socket.Close()
+	return ws.socket.Close()
 }
 
 // PingParams returns ping params
-func (wsc *WebsocketConnection) PingParams() (time.Duration, time.Duration) {
-	return wsc.transport.PingInterval, wsc.transport.PingTimeout
+func (ws *WebsocketConnection) PingParams() (time.Duration, time.Duration) {
+	return ws.transport.PingInterval, ws.transport.PingTimeout
 }
 
 // WebsocketTransport implements websocket transport
@@ -115,37 +115,37 @@ type WebsocketTransport struct {
 }
 
 // Connect to the given url
-func (wst *WebsocketTransport) Connect(url string) (Connection, error) {
+func (t *WebsocketTransport) Connect(url string) (Connection, error) {
 	dialer := websocket.Dialer{}
-	socket, _, err := dialer.Dial(url, wst.Headers)
+	socket, _, err := dialer.Dial(url, t.Headers)
 	if err != nil {
 		return nil, err
 	}
 
-	return &WebsocketConnection{socket, wst}, nil
+	return &WebsocketConnection{socket, t}, nil
 }
 
 // HandleConnection
-func (wst *WebsocketTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
+func (t *WebsocketTransport) HandleConnection(w http.ResponseWriter, r *http.Request) (Connection, error) {
 	if r.Method != http.MethodGet {
 		http.Error(w, upgradeFailed+errMethodNotAllowed.Error(), http.StatusServiceUnavailable)
 		return nil, errMethodNotAllowed
 	}
 
 	socket, err := (&websocket.Upgrader{
-		ReadBufferSize:  wst.BufferSize,
-		WriteBufferSize: wst.BufferSize,
+		ReadBufferSize:  t.BufferSize,
+		WriteBufferSize: t.BufferSize,
 	}).Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, upgradeFailed+err.Error(), http.StatusServiceUnavailable)
 		return nil, errHttpUpgradeFailed
 	}
 
-	return &WebsocketConnection{socket, wst}, nil
+	return &WebsocketConnection{socket, t}, nil
 }
 
 // Serve does nothing here. Websocket connection does not require any additional processing
-func (wst *WebsocketTransport) Serve(w http.ResponseWriter, r *http.Request) {}
+func (t *WebsocketTransport) Serve(w http.ResponseWriter, r *http.Request) {}
 
 // DefaultWebsocketTransport returns websocket connection with default params
 func DefaultWebsocketTransport() *WebsocketTransport {
