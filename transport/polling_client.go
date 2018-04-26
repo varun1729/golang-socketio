@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -54,7 +53,7 @@ func (polling *PollingClientConnection) GetMessage() (string, error) {
 
 // WriteMessage performs a POST request to send a message to server
 func (polling *PollingClientConnection) WriteMessage(message string) error {
-	msgToWrite := strconv.Itoa(len(message)) + ":" + message
+	msgToWrite := withLength(message)
 	logging.Log().Debug("PollingConnection.WriteMessage() fired, msgToWrite:", msgToWrite)
 	var jsonStr = []byte(msgToWrite)
 

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"fmt"
 	"github.com/mtfelian/golang-socketio/logging"
 	"github.com/mtfelian/golang-socketio/protocol"
 )
@@ -31,6 +31,9 @@ var (
 	errReceivedConnectionClose = errors.New("received connection close")
 	errWriteMessageTimeout     = errors.New("timeout waiting for write")
 )
+
+// withLength returns s as a message with length
+func withLength(m string) string { return fmt.Sprintf("%d:%s", len(m), m) }
 
 // PollingTransportParams represents XHR polling transport params
 type PollingTransportParams struct {
@@ -212,8 +215,8 @@ func (polling *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.R
 		polling.errors <- noError
 	case message := <-polling.eventsOutC:
 		logging.Log().Debug("PollingTransport.PollingWriter() prepares to write message:", message)
-		message = strconv.Itoa(len(message)) + ":" + message
-		if message == protocol.MessageClose+":"+protocol.MessageBlank {
+		message = withLength(message)
+		if message == withLength(protocol.MessageBlank) {
 			logging.Log().Debug("PollingTransport.PollingWriter() writing 1:6")
 
 			hj, ok := w.(http.Hijacker)
@@ -234,7 +237,7 @@ func (polling *PollingConnection) PollingWriter(w http.ResponseWriter, r *http.R
 				"Cache-Control: no-cache, private\r\n" +
 				"Content-Length: 3\r\n" +
 				"Date: Mon, 24 Nov 2016 10:21:21 GMT\r\n\r\n")
-			buffer.WriteString(protocol.MessageClose + ":" + protocol.MessageBlank)
+			buffer.WriteString(withLength(protocol.MessageBlank))
 			buffer.Flush()
 			logging.Log().Debug("PollingTransport.PollingWriter() hijack returns")
 			polling.errors <- noError
