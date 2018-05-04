@@ -137,16 +137,16 @@ func (c *Channel) inLoop(e *event) error {
 
 		switch decodedMessage.Type {
 		case protocol.MessageTypeOpen:
-			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen: %+v", decodedMessage)
+			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen, decodedMessage: %+v", decodedMessage)
 			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.connHeader); err != nil {
 				c.close(e)
 			}
 			e.callLoopEvent(c, OnConnection)
 
 		case protocol.MessageTypePing:
-			logging.Log().Debugf("inLoop(), protocol.MessageTypePing: %+v", decodedMessage)
+			logging.Log().Debugf("inLoop(), protocol.MessageTypePing, decodedMessage: %+v", decodedMessage)
 			if decodedMessage.Source == protocol.MessagePingProbe {
-				logging.Log().Debugf("inLoop(), got %s", decodedMessage.Source)
+				logging.Log().Debugf("inLoop(), decodedMessage.Source: %s", decodedMessage.Source)
 				c.outC <- protocol.MessagePongProbe
 				c.upgradedC <- transport.UpgradedMessage
 			} else {
@@ -168,7 +168,7 @@ func (c *Channel) inLoop(e *event) error {
 func (c *Channel) outLoop(e *event) error {
 	for {
 		outBufferLen := len(c.outC)
-		logging.Log().Debug("outLoop(), outBufferLen: ", outBufferLen)
+		logging.Log().Debug("outLoop(), outBufferLen:", outBufferLen)
 		switch {
 		case outBufferLen >= queueBufferSize-1:
 			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
@@ -190,7 +190,7 @@ func (c *Channel) outLoop(e *event) error {
 		}
 
 		if err := c.conn.WriteMessage(msg); err != nil {
-			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage(), err: ", err)
+			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage() with err:", err)
 			return c.close(e)
 		}
 	}
@@ -215,7 +215,7 @@ func (c *Channel) send(m *protocol.Message, payload interface{}) error {
 	// preventing encoding/json "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
-			logging.Log().Warn("socket.io send panic: ", r)
+			logging.Log().Warn("socket.io send panic:", r)
 		}
 	}()
 

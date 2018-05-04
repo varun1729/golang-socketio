@@ -19,7 +19,7 @@ var (
 	ErrorHandlerWrongResult = errors.New("f should return no more than one value")
 )
 
-// newHandler parses function f (event handler) using reflection, and stores its representation
+// newHandler parses function f (event handler) using reflection, and stores it's representation
 func newHandler(f interface{}) (*handler, error) {
 	fVal := reflect.ValueOf(f)
 	if fVal.Kind() != reflect.Func {

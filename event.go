@@ -74,17 +74,17 @@ func (e *event) callLoopEvent(c *Channel, event string) {
 
 // processIncomingEvent checks incoming message
 func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
-	logging.Log().Debug("processIncomingEvent(): ", msg)
+	logging.Log().Debug("processIncomingEvent() fired with:", msg)
 	switch msg.Type {
 	case protocol.MessageTypeEmit:
-		logging.Log().Debug("processIncomingEvent() is finding handler: ", msg.Event)
+		logging.Log().Debug("processIncomingEvent() is finding handler for msg.Event:", msg.Event)
 		f, ok := e.findEvent(msg.Event)
 		if !ok {
 			logging.Log().Debug("processIncomingEvent(): handler not found")
 			return
 		}
 
-		logging.Log().Debug("processIncomingEvent() found method: ", f)
+		logging.Log().Debug("processIncomingEvent() found handler:", f)
 
 		if !f.hasArgs {
 			f.call(c, &struct{}{})
@@ -92,17 +92,18 @@ func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		}
 
 		data := f.arguments()
-		logging.Log().Debug("processIncomingEvent(): f.arguments() returned ", data)
+		logging.Log().Debug("processIncomingEvent(), f.arguments() returned:", data)
 
 		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
-			logging.Log().Infof("Error processing message. msg.Args: %s, data: %v, err: %v", msg.Args, data, err)
+			logging.Log().Infof("processIncomingEvent() failed to json.Unmaeshal(). msg.Args: %s, data: %v, err: %v",
+				msg.Args, data, err)
 			return
 		}
 
 		f.call(c, data)
 
 	case protocol.MessageTypeAckRequest:
-		logging.Log().Debug("processIncomingEvent(): ack request")
+		logging.Log().Debug("processIncomingEvent() ack request")
 		f, ok := e.findEvent(msg.Event)
 		if !ok || !f.out {
 			return
@@ -128,7 +129,7 @@ func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		c.send(ackResponse, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
-		logging.Log().Debug("processIncomingEvent(): ack response")
+		logging.Log().Debug("processIncomingEvent() ack response")
 		ackC, err := c.ack.obtain(msg.AckId)
 		if err == nil {
 			ackC <- msg.Args
