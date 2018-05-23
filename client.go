@@ -9,69 +9,64 @@ import (
 )
 
 const (
-	webSocketProtocol       = "ws://"
-	webSocketSecureProtocol = "wss://"
-	socketioWebsocketUrl    = "/socket.io/?EIO=3&transport=websocket"
+	webSocketSchema       = "ws://"
+	webSocketSecureSchema = "wss://"
+	socketioWebsocketURL  = "/socket.io/?EIO=3&transport=websocket"
 
-	pollingProtocol       = "http://"
-	pollingSecureProtocol = "https://"
-	socketioPollingUrl    = "/socket.io/?EIO=3&transport=polling"
+	pollingSchema       = "http://"
+	pollingSecureSchema = "https://"
+	socketioPollingURL  = "/socket.io/?EIO=3&transport=polling"
 )
 
-// Socket.io client representation
+// Client represents socket.io client
 type Client struct {
-	methods
-	Channel
+	*event
+	*Channel
 }
 
-// GetUrl returns an url for socket.io connection for wesocket transport
-func GetUrl(host string, port int, secure bool) string {
-	prefix := webSocketProtocol
+// AddrWebsocket returns an url for socket.io connection for websocket transport
+func AddrWebsocket(host string, port int, secure bool) string {
+	prefix := webSocketSchema
 	if secure {
-		prefix = webSocketSecureProtocol
+		prefix = webSocketSecureSchema
 	}
-	return prefix + host + ":" + strconv.Itoa(port) + socketioWebsocketUrl
+	return prefix + host + ":" + strconv.Itoa(port) + socketioWebsocketURL
 }
 
-// GetUrlPolling returns an url for socket.io connection for polling transport
-func GetUrlPolling(host string, port int, secure bool) string {
-	prefix := pollingProtocol
+// AddrPolling returns an url for socket.io connection for polling transport
+func AddrPolling(host string, port int, secure bool) string {
+	prefix := pollingSchema
 	if secure {
-		prefix = pollingSecureProtocol
+		prefix = pollingSecureSchema
 	}
-
-	return prefix + host + ":" + strconv.Itoa(port) + socketioPollingUrl
+	return prefix + host + ":" + strconv.Itoa(port) + socketioPollingURL
 }
 
-// connect to host and initialise socket.io protocol
-// The correct ws protocol url example:
+// Dial connects to server and initializes socket.io protocol
+// The correct ws protocol addr example:
 // ws://myserver.com/socket.io/?EIO=3&transport=websocket
-// You can use GetUrlByHost for generating correct url
-func Dial(url string, tr transport.Transport) (*Client, error) {
-	c := &Client{}
-	c.initChannel()
-	c.initMethods()
+func Dial(addr string, tr transport.Transport) (*Client, error) {
+	c := &Client{Channel: &Channel{}, event: &event{}}
+	c.Channel.init()
+	c.event.init()
 
 	var err error
-	c.conn, err = tr.Connect(url)
+	c.conn, err = tr.Connect(addr)
 	if err != nil {
 		return nil, err
 	}
 
-	go inLoop(&c.Channel, &c.methods)
-	go outLoop(&c.Channel, &c.methods)
-	go pinger(&c.Channel)
+	go c.Channel.inLoop(c.event)
+	go c.Channel.outLoop(c.event)
+	go c.Channel.pingLoop()
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
-		//time.Sleep(time.Second)
-		go pollingClientListener(&c.Channel, &c.methods)
+		go c.event.callHandler(c.Channel, OnConnection)
 	}
 
 	return c, nil
 }
 
 // Close client connection
-func (c *Client) Close() {
-	CloseChannel(&c.Channel, &c.methods)
-}
+func (c *Client) Close() { c.Channel.close(c.event) }

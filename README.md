@@ -1,160 +1,34 @@
-golang socket.io
-================
+# Golang Socker.IO
 
 This library was forked from github.com/graarh/golang-socketio
 
-Golang implementation of [socket.io](http://socket.io) library, client and server via websocket and XHR polling transports. 
+It provides a simple Golang implementation of
+[socket.io](http://socket.io) client and server.
 
-Main task of this fork was the XHR polling transport implementation and upgrade from XHR polling to websocket. 
 
-Examples directory contains simple client and server (outdated).
+## Usage examples
 
-### Installation
+Please observe the `examples` directory for usage examples:
+
+```
+JavaScript client:    examples/assets/index.html
+Go server:            go run examples/server/server.go
+Go client via WS:     go run examples/client_websocket/client.go
+Go client via XHR:    go run examples/client_xhr_polling/client.go
+```
+
+Please note that no Go client upgrade implemented yet.
+
+This client is mainly for testing purposes.
+
+## Installation
 
     go get github.com/mtfelian/golang-socketio
 
-### Usage (outdated)
+## TODOs, ideas to further development
 
-#### Simple server usage 
-
-```go
-	//create
-	server := gosocketio.NewServer()
-
-	//handle connected
-	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel) {
-		log.Println("New client connected")
-		//join them to room
-		c.Join("chat")
-	})
-
-	type Message struct {
-		Name string `json:"name"`
-		Message string `json:"message"`
-	}
-
-	//handle custom event
-	server.On("send", func(c *gosocketio.Channel, msg Message) string {
-		//send event to all in room
-		c.BroadcastTo("chat", "message", msg)
-		return "OK"
-	})
-
-	//setup http server
-	serveMux := http.NewServeMux()
-	serveMux.Handle("/socket.io/", server)
-	log.Panic(http.ListenAndServe(":80", serveMux))
-```
-
-#### Javascript client for this server
-
-```javascript
-var socket = io('ws://yourdomain.com', {transports: ['websocket']});
-
-    // listen for messages
-    socket.on('message', function(message) {
-
-        console.log('new message');
-        console.log(message);
-    });
-
-    socket.on('connect', function () {
-
-        console.log('socket connected');
-
-        //send something
-        socket.emit('send', {name: "my name", message: "hello"}, function(result) {
-
-            console.log('sended successfully');
-            console.log(result);
-        });
-    });
-```
-
-#### Server, detailed usage
-
-```go
-    //create server instance, you can setup transport parameters or get the default one
-    //look at websocket.go for parameters description
-	server := gosocketio.NewServer()
-
-	// --- this is default handlers
-
-	//on connection handler, occurs once for each connected client
-	server.On(gosocketio.OnConnection, func(c *gosocketio.Channel, args interface{}) {
-	    //client id is unique
-		log.Println("New client connected, client id is ", c.Id())
-
-		//you can join clients to rooms
-		c.Join("room name")
-
-		//of course, you can list the clients in the room, or account them
-		channels := c.List(data.Channel)
-		//or check the amount of clients in room
-		amount := c.Amount(data.Channel)
-		log.Println(amount, "clients in room")
-	})
-	//on disconnection handler, if client hangs connection unexpectedly, it will still occurs
-	//you can omit function args if you do not need them
-	//you can return string value for ack, or return nothing for emit
-	server.On(gosocketio.OnDisconnection, func(c *gosocketio.Channel) {
-		//this is not necessary, client will be removed from rooms
-		//automatically on disconnect
-		//but you can remove client from room whenever you need to
-		c.Leave("room name")
-
-		log.Println("Disconnected")
-	})
-	//error catching handler
-	server.On(gosocketio.OnError, func(c *gosocketio.Channel) {
-		log.Println("Error occurs")
-	})
-
-	// --- this is custom handler
-
-	//custom event handler
-	server.On("handle something", func(c *gosocketio.Channel, channel Channel) string {
-		log.Println("Something successfully handled")
-
-		//you can return result of handler, in this case
-		//handler will be converted from "emit" to "ack"
-		return "result"
-	})
-
-    //you can get client connection by it's id
-    channel, _ := server.GetChannel("client id here")
-    //and send the event to the client
-    type MyEventData struct {
-        Data: string
-    }
-    channel.Emit("my event", MyEventData{"my data"})
-
-    //or you can send ack to client and get result back
-    result, err := channel.Ack("my custom ack", MyEventData{"ack data"}, time.Second * 5)
-
-    //you can broadcast to all clients
-    server.BroadcastToAll("my event", MyEventData{"broadcast"})
-
-    //or for clients joined to room
-    server.BroadcastTo("my room", "my event", MyEventData{"room broadcast"})
-
-    //setup http server like this for handling connections
-	serveMux := http.NewServeMux()
-	serveMux.Handle("/socket.io/", server)
-	log.Panic(http.ListenAndServe(":80", serveMux))
-```
-
-#### Client
-
-```go
-    //connect to server, you can use your own transport settings
-	c, err := gosocketio.Dial(
-		gosocketio.GetUrl("localhost", 80, false),
-		transport.GetDefaultWebsocketTransport(),
-	)
-
-	//do something, handlers and functions are same as server ones
-
-	//close connection
-	c.Close()
-```
+- write tests, make a good test coverage
+- Go client's upgrade from XHR to WS
+- Go server's ability to fallback from WS to XHR
+- Go client's ability to fallback from WS to XHR
+- support newer versions of socket.io protocol

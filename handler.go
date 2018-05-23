@@ -1,142 +1,69 @@
 package gosocketio
 
 import (
-	"encoding/json"
-	"fmt"
+	"errors"
 	"reflect"
-	"sync"
-
-	"github.com/mtfelian/golang-socketio/logging"
-	"github.com/mtfelian/golang-socketio/protocol"
 )
 
-const (
-	OnConnection    = "connection"
-	OnDisconnection = "disconnection"
-	OnError         = "error"
+// handler is an event handler representation
+type handler struct {
+	function reflect.Value
+	args     reflect.Type
+	hasArgs  bool
+	out      bool
+}
+
+var (
+	ErrorHandlerIsNotFunc   = errors.New("f is not a function")
+	ErrorHandlerHasNot2Args = errors.New("f should have 1 or 2 arguments")
+	ErrorHandlerWrongResult = errors.New("f should return no more than one value")
 )
 
-// System handler function for internal event processing
-type systemHandler func(c *Channel)
-
-// Contains maps of message processing functions
-type methods struct {
-	messageHandlers     map[string]*caller
-	messageHandlersLock sync.RWMutex
-
-	onConnection    systemHandler
-	onDisconnection systemHandler
-}
-
-// create messageHandlers map
-func (m *methods) initMethods() {
-	m.messageHandlers = make(map[string]*caller)
-}
-
-// Add message processing function, and bind it to given method
-func (m *methods) On(method string, f interface{}) error {
-	c, err := newCaller(f)
-	if err != nil {
-		return err
+// newHandler parses function f (event handler) using reflection, and stores it's representation
+func newHandler(f interface{}) (*handler, error) {
+	fVal := reflect.ValueOf(f)
+	if fVal.Kind() != reflect.Func {
+		return nil, ErrorHandlerIsNotFunc
 	}
 
-	m.messageHandlersLock.Lock()
-	defer m.messageHandlersLock.Unlock()
-	m.messageHandlers[method] = c
+	fType := fVal.Type()
+	if fType.NumOut() > 1 {
+		return nil, ErrorHandlerWrongResult
+	}
 
-	return nil
+	curCaller := &handler{
+		function: fVal,
+		out:      fType.NumOut() == 1,
+	}
+
+	switch fType.NumIn() {
+	case 1:
+		curCaller.args = nil
+		curCaller.hasArgs = false
+	case 2:
+		curCaller.args = fType.In(1)
+		curCaller.hasArgs = true
+	default:
+		return nil, ErrorHandlerHasNot2Args
+	}
+
+	return curCaller, nil
 }
 
-// Find message processing function associated with given method
-func (m *methods) findMethod(method string) (*caller, bool) {
-	m.messageHandlersLock.RLock()
-	defer m.messageHandlersLock.RUnlock()
+// arguments returns function parameter as it is present in it using reflection
+func (h *handler) arguments() interface{} { return reflect.New(h.args).Interface() }
 
-	f, ok := m.messageHandlers[method]
-	return f, ok
-}
-
-func (m *methods) callLoopEvent(c *Channel, event string) {
-	if m.onConnection != nil && event == OnConnection {
-		logging.Log().Debug("OnConnection callloopevent")
-		m.onConnection(c)
-	}
-	if m.onDisconnection != nil && event == OnDisconnection {
-		m.onDisconnection(c)
+// call func with given arguments from its representation using reflection
+func (h *handler) call(c *Channel, arguments interface{}) []reflect.Value {
+	// nil is untyped, so use the default empty value of correct type
+	if arguments == nil {
+		arguments = h.arguments()
 	}
 
-	f, ok := m.findMethod(event)
-	if !ok {
-		logging.Log().Debug("not found method")
-		return
+	a := []reflect.Value{reflect.ValueOf(c), reflect.ValueOf(arguments).Elem()}
+	if !h.hasArgs {
+		a = a[0:1]
 	}
 
-	f.callFunc(c, &struct{}{})
-}
-
-// Check incoming message
-// On ack_resp - look for waiter
-// On ack_req - look for processing function and send ack_resp
-// On emit - look for processing function
-func (m *methods) processIncomingMessage(c *Channel, msg *protocol.Message) {
-	logging.Log().Debug("processIncomingMessage ", msg)
-	switch msg.Type {
-	case protocol.MessageTypeEmit:
-		logging.Log().Debug("finding method ", msg.Method)
-		f, ok := m.findMethod(msg.Method)
-		if !ok {
-			logging.Log().Debug("not found method")
-			return
-		}
-
-		logging.Log().Debug("found method ", f)
-
-		if !f.ArgsPresent {
-			f.callFunc(c, &struct{}{})
-			return
-		}
-
-		data := f.getArgs()
-		logging.Log().Debug("f.getArgs ", data)
-
-		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
-			fmt.Printf("Error processing message. msg.Args: %v, data: %v, err: %v\n", msg.Args, data, err)
-			return
-		}
-
-		f.callFunc(c, data)
-
-	case protocol.MessageTypeAckRequest:
-		logging.Log().Debug("ack request")
-		f, ok := m.findMethod(msg.Method)
-		if !ok || !f.Out {
-			return
-		}
-
-		var result []reflect.Value
-		if f.ArgsPresent {
-			// data type should be defined for Unmarshal()
-			data := f.getArgs()
-			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
-				return
-			}
-			result = f.callFunc(c, data)
-		} else {
-			result = f.callFunc(c, &struct{}{})
-		}
-
-		ack := &protocol.Message{
-			Type:  protocol.MessageTypeAckResponse,
-			AckId: msg.AckId,
-		}
-
-		send(ack, c, result[0].Interface())
-
-	case protocol.MessageTypeAckResponse:
-		logging.Log().Debug("ack response")
-		waiter, err := c.ack.getWaiter(msg.AckId)
-		if err == nil {
-			waiter <- msg.Args
-		}
-	}
+	return h.function.Call(a)
 }

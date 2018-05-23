@@ -1,41 +1,23 @@
 package protocol
 
 const (
-	// Message with connection options
-	MessageTypeOpen = iota
-
-	// Close connection and destroy all handle routines
-	MessageTypeClose = iota
-
-	// Ping request message
-	MessageTypePing = iota
-
-	// Pong response message
-	MessageTypePong = iota
-
-	// Empty message
-	MessageTypeEmpty = iota
-
-	// Emit request, no response
-	MessageTypeEmit = iota
-
-	// Emit request, wait for response (ack)
-	MessageTypeAckRequest = iota
-
-	// ack response
-	MessageTypeAckResponse = iota
-
-	// Upgrade message
-	MessageTypeUpgrade = iota
-
-	// Blank message
-	MessageTypeBlank = iota
+	MessageTypeOpen        = iota // message with connection options
+	MessageTypeClose              // close connection and destroy all handle routines
+	MessageTypePing               // ping request message
+	MessageTypePong               // pong response message
+	MessageTypeEmpty              // empty message
+	MessageTypeEmit               // emit request, no response
+	MessageTypeAckRequest         // emit request, wait for response (ack)
+	MessageTypeAckResponse        // ack response
+	MessageTypeUpgrade            // upgrade message
+	MessageTypeBlank              // blank message
 )
 
+// Message represents socket.io message
 type Message struct {
-	Type   int
-	AckId  int
-	Method string
-	Args   string
-	Source string
+	Type      int
+	AckID     int
+	EventName string
+	Args      string
+	Source    string
 }

@@ -8,15 +8,21 @@ import (
 
 var log *logrus.Logger
 
-func init() {
+// Log returns the logger object
+func Log() *logrus.Logger { return log }
+
+// initLogger mainly for debug purposes
+func initLogger() {
+	logLevel, err := logrus.ParseLevel(os.Getenv("SIO_LL"))
+	if err != nil {
+		logLevel = logrus.WarnLevel
+	}
+
 	log = &logrus.Logger{
 		Formatter: new(logrus.TextFormatter),
 		Out:       os.Stdout,
-		Level:     logrus.WarnLevel,
+		Level:     logLevel,
 	}
 }
 
-// Log returns the logger object
-func Log() *logrus.Logger {
-	return log
-}
+func init() { initLogger() }
