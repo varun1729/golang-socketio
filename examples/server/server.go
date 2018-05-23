@@ -123,16 +123,15 @@ func assetsFileHandler(w http.ResponseWriter, r *http.Request) {
 	file := r.URL.Path
 	f, err := assetsDir.Open(file)
 	if err != nil {
-		log.Fatalf("can't open file %s: %v\n", file, err)
+		log.Printf("can't open file %s: %v\n", file, err)
 		return
 	}
 	defer f.Close()
 
 	fi, err := f.Stat()
 	if err != nil {
-		log.Fatalf("can't open file %s: %v\n", file, err)
+		log.Printf("can't open file %s: %v\n", file, err)
 		return
 	}
-
 	http.ServeContent(w, r, file, fi.ModTime(), f)
 }
