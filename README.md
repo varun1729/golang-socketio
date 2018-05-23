@@ -1,4 +1,4 @@
-# Golang Socker.IO
+# Golang Socket.IO
 
 This library was forked from github.com/graarh/golang-socketio
 
