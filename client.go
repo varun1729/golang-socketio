@@ -62,7 +62,7 @@ func Dial(addr string, tr transport.Transport) (*Client, error) {
 
 	switch tr.(type) {
 	case *transport.PollingClientTransport:
-		go c.event.callLoopEvent(c.Channel, OnConnection)
+		go c.event.callHandler(c.Channel, OnConnection)
 	}
 
 	return c, nil

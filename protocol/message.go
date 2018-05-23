@@ -15,9 +15,9 @@ const (
 
 // Message represents socket.io message
 type Message struct {
-	Type   int
-	AckId  int
-	Event  string
-	Args   string
-	Source string
+	Type      int
+	AckID     int
+	EventName string
+	Args      string
+	Source    string
 }

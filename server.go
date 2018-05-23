@@ -199,20 +199,20 @@ func (s *Server) setupEventLoop(conn transport.Connection, address string, heade
 	go c.inLoop(s.event)
 	go c.outLoop(s.event)
 
-	s.callLoopEvent(c, OnConnection)
+	s.callHandler(c, OnConnection)
 }
 
 // upgradeEventLoop at transport upgrade
 func (s *Server) upgradeEventLoop(conn transport.Connection, remoteAddr string, header http.Header, sid string) {
-	logging.Log().Debug("upgradeEventLoop() fired")
+	logging.Log().Debug("Server.upgradeEventLoop() fired")
 
 	pollingChannel, err := s.GetChannel(sid)
 	if err != nil {
-		logging.Log().Warn("upgradeEventLoop() can't find channel for session:", sid)
+		logging.Log().Warn("Server.upgradeEventLoop() can't find channel for session:", sid)
 		return
 	}
 
-	logging.Log().Debug("upgradeEventLoop() obtained a polling channel")
+	logging.Log().Debug("Server.upgradeEventLoop() obtained a polling channel")
 	interval, timeout := conn.PingParams()
 	connHeader := connectionHeader{
 		Sid:          sid,
@@ -223,12 +223,12 @@ func (s *Server) upgradeEventLoop(conn transport.Connection, remoteAddr string, 
 
 	c := &Channel{conn: conn, address: remoteAddr, header: header, server: s, connHeader: connHeader}
 	c.init()
-	logging.Log().Debug("upgradeEventLoop() initialized a new channel")
+	logging.Log().Debug("Server.upgradeEventLoop() initialized a new channel")
 
 	go c.inLoop(s.event)
 	go c.outLoop(s.event)
 
-	logging.Log().Debug("upgradeEventLoop() fired c.inLoop() and c.outLoop() in separate go-routines")
+	logging.Log().Debug("Server.upgradeEventLoop() fired c.inLoop() and c.outLoop() in separate go-routines")
 	onConnection(c)
 
 	// synchronize stubbing polling channel with receiving "2probe" message
@@ -254,19 +254,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.setupEventLoop(conn, r.RemoteAddr, r.Header)
-		logging.Log().Debug("ServeHTTP() created a PollingConnection")
+		logging.Log().Debug("Server.ServeHTTP() created a PollingConnection")
 		conn.(*transport.PollingConnection).PollingWriter(w, r)
 
 	case "websocket":
 		if session != "" {
-			logging.Log().Debug("ServeHTTP() is firing s.websocket.HandleConnection() for upgrade")
+			logging.Log().Debug("Server.ServeHTTP() is firing s.websocket.HandleConnection() for upgrade")
 			conn, err := s.websocket.HandleConnection(w, r)
 			if err != nil {
-				logging.Log().Debug("upgrade error ", err)
+				logging.Log().Debug("Server.ServeHTTP() upgrade error:", err)
 				return
 			}
 			s.upgradeEventLoop(conn, r.RemoteAddr, r.Header, session)
-			logging.Log().Debug("ServeHTTP() upgraded to a WebsocketConnection")
+			logging.Log().Debug("Server.ServeHTTP() upgraded to a WebsocketConnection")
 			return
 		}
 
@@ -276,7 +276,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.setupEventLoop(conn, r.RemoteAddr, r.Header)
-		logging.Log().Debug("ServeHTTP() created a WebsocketConnection")
+		logging.Log().Debug("Server.ServeHTTP() created a WebsocketConnection")
 	}
 }
 

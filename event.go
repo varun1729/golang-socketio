@@ -44,47 +44,48 @@ func (e *event) On(name string, f interface{}) error {
 	return nil
 }
 
-// findEvent returns a handler representation for the given event name
+// findHandler returns a handler representation for the given event name
 // the second parameter is true if such event found.
-func (e *event) findEvent(name string) (*handler, bool) {
+func (e *event) findHandler(name string) (*handler, bool) {
 	e.handlersMu.RLock()
 	f, ok := e.handlers[name]
 	e.handlersMu.RUnlock()
 	return f, ok
 }
 
-func (e *event) callLoopEvent(c *Channel, event string) {
-	if e.onConnection != nil && event == OnConnection {
-		logging.Log().Debug("callLoopEvent(): OnConnection handler")
+// callHandler for the given channel c and event name
+func (e *event) callHandler(c *Channel, name string) {
+	if e.onConnection != nil && name == OnConnection {
+		logging.Log().Debug("event.callHandler(): OnConnection handler")
 		e.onConnection(c)
 	}
 
-	if e.onDisconnection != nil && event == OnDisconnection {
+	if e.onDisconnection != nil && name == OnDisconnection {
 		e.onDisconnection(c)
 	}
 
-	f, ok := e.findEvent(event)
+	f, ok := e.findHandler(name)
 	if !ok {
-		logging.Log().Debug("callLoopEvent(): handler not found")
+		logging.Log().Debug("event.callHandler(): handler not found")
 		return
 	}
 
 	f.call(c, &struct{}{})
 }
 
-// processIncomingEvent checks incoming message
-func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
-	logging.Log().Debug("processIncomingEvent() fired with:", msg)
-	switch msg.Type {
+// processIncoming checks incoming message m on channel c
+func (e *event) processIncoming(c *Channel, m *protocol.Message) {
+	logging.Log().Debug("event.processIncoming() fired with:", m)
+	switch m.Type {
 	case protocol.MessageTypeEmit:
-		logging.Log().Debug("processIncomingEvent() is finding handler for msg.Event:", msg.Event)
-		f, ok := e.findEvent(msg.Event)
+		logging.Log().Debug("event.processIncoming() is finding handler for msg.Event:", m.EventName)
+		f, ok := e.findHandler(m.EventName)
 		if !ok {
-			logging.Log().Debug("processIncomingEvent(): handler not found")
+			logging.Log().Debug("event.processIncoming(): handler not found")
 			return
 		}
 
-		logging.Log().Debug("processIncomingEvent() found handler:", f)
+		logging.Log().Debug("event.processIncoming() found handler:", f)
 
 		if !f.hasArgs {
 			f.call(c, &struct{}{})
@@ -92,19 +93,19 @@ func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		}
 
 		data := f.arguments()
-		logging.Log().Debug("processIncomingEvent(), f.arguments() returned:", data)
+		logging.Log().Debug("event.processIncoming(), f.arguments() returned:", data)
 
-		if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
-			logging.Log().Infof("processIncomingEvent() failed to json.Unmaeshal(). msg.Args: %s, data: %v, err: %v",
-				msg.Args, data, err)
+		if err := json.Unmarshal([]byte(m.Args), &data); err != nil {
+			logging.Log().Infof("event.processIncoming() failed to json.Unmaeshal(). msg.Args: %s, data: %v, err: %v",
+				m.Args, data, err)
 			return
 		}
 
 		f.call(c, data)
 
 	case protocol.MessageTypeAckRequest:
-		logging.Log().Debug("processIncomingEvent() ack request")
-		f, ok := e.findEvent(msg.Event)
+		logging.Log().Debug("event.processIncoming() ack request")
+		f, ok := e.findHandler(m.EventName)
 		if !ok || !f.out {
 			return
 		}
@@ -113,7 +114,7 @@ func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
 		if f.hasArgs {
 			// data type should be defined for Unmarshal()
 			data := f.arguments()
-			if err := json.Unmarshal([]byte(msg.Args), &data); err != nil {
+			if err := json.Unmarshal([]byte(m.Args), &data); err != nil {
 				return
 			}
 			result = f.call(c, data)
@@ -123,16 +124,16 @@ func (e *event) processIncomingEvent(c *Channel, msg *protocol.Message) {
 
 		ackResponse := &protocol.Message{
 			Type:  protocol.MessageTypeAckResponse,
-			AckId: msg.AckId,
+			AckID: m.AckID,
 		}
 
 		c.send(ackResponse, result[0].Interface())
 
 	case protocol.MessageTypeAckResponse:
-		logging.Log().Debug("processIncomingEvent() ack response")
-		ackC, err := c.ack.obtain(msg.AckId)
+		logging.Log().Debug("event.processIncoming() ack response")
+		ackC, err := c.ack.obtain(m.AckID)
 		if err == nil {
-			ackC <- msg.Args
+			ackC <- m.Args
 		}
 	}
 }

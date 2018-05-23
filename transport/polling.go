@@ -55,13 +55,13 @@ func (polling *PollingConnection) GetMessage() (string, error) {
 	case <-time.After(polling.Transport.ReceiveTimeout):
 		logging.Log().Debug("PollingConnection.GetMessage() timed out")
 		return "", errGetMessageTimeout
-	case msg := <-polling.eventsInC:
-		logging.Log().Debug("PollingConnection.GetMessage() received:", msg)
-		if msg == protocol.MessageClose {
+	case m := <-polling.eventsInC:
+		logging.Log().Debug("PollingConnection.GetMessage() received:", m)
+		if m == protocol.MessageClose {
 			logging.Log().Debug("PollingConnection.GetMessage() received connection close")
 			return "", errReceivedConnectionClose
 		}
-		return msg, nil
+		return m, nil
 	}
 }
 

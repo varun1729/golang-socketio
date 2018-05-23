@@ -30,8 +30,8 @@ var (
 	ErrorWrongPacket      = errors.New("wrong packet")
 )
 
-func typeToText(messageType int) (string, error) {
-	m := map[int]string{
+func typeToText(mType int) (string, error) {
+	codesToNames := map[int]string{
 		MessageTypeOpen:        MessageOpen,
 		MessageTypeClose:       MessageClose,
 		MessageTypePing:        MessagePing,
@@ -41,43 +41,43 @@ func typeToText(messageType int) (string, error) {
 		MessageTypeAckRequest:  messageCommon,
 		MessageTypeAckResponse: messageACK,
 	}
-	msg, exists := m[messageType]
+	mName, exists := codesToNames[mType]
 	if !exists {
 		return "", ErrorWrongMessageType
 	}
-	return msg, nil
+	return mName, nil
 }
 
-// Encode a socket.io message to the protocol format
-func Encode(message *Message) (string, error) {
-	result, err := typeToText(message.Type)
+// Encode a socket.io message m to the protocol format
+func Encode(m *Message) (string, error) {
+	result, err := typeToText(m.Type)
 	if err != nil {
 		return "", err
 	}
 
-	switch message.Type {
+	switch m.Type {
 	case MessageTypeEmpty, MessageTypePing, MessageTypePong:
 		return result, nil
 	case MessageTypeAckRequest:
-		result += strconv.Itoa(message.AckId)
+		result += strconv.Itoa(m.AckID)
 	case MessageTypeAckResponse:
-		result += strconv.Itoa(message.AckId)
-		return result + "[" + message.Args + "]", nil
+		result += strconv.Itoa(m.AckID)
+		return result + "[" + m.Args + "]", nil
 	case MessageTypeOpen, MessageTypeClose:
-		return result + message.Args, nil
+		return result + m.Args, nil
 	}
 
-	jsonMethod, err := json.Marshal(&message.Event)
+	jsonMethod, err := json.Marshal(&m.EventName)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(`%s[%s,%s]`, result, string(jsonMethod), message.Args), nil
+	return fmt.Sprintf(`%s[%s,%s]`, result, string(jsonMethod), m.Args), nil
 }
 
-// MustEncode the message acts like Encode but panics on error
-func MustEncode(message *Message) string {
-	result, err := Encode(message)
+// MustEncode the message m acts like Encode but panics on error
+func MustEncode(m *Message) string {
+	result, err := Encode(m)
 	if err != nil {
 		panic(err)
 	}
@@ -174,40 +174,40 @@ func getMethod(text string) (event, restText string, err error) {
 // Decode the given data string into a Message
 func Decode(data string) (*Message, error) {
 	var err error
-	msg := &Message{Source: data}
+	m := &Message{Source: data}
 
-	msg.Type, err = getMessageType(data)
+	m.Type, err = getMessageType(data)
 	if err != nil {
 		return nil, err
 	}
 
-	switch msg.Type {
+	switch m.Type {
 	case MessageTypeUpgrade, MessageTypeClose, MessageTypePing, MessageTypePong, MessageTypeEmpty, MessageTypeBlank:
-		return msg, nil
+		return m, nil
 	case MessageTypeOpen:
-		msg.Args = data[1:]
-		return msg, nil
+		m.Args = data[1:]
+		return m, nil
 	}
 
 	ack, rest, err := getAck(data)
-	msg.AckId = ack
-	if msg.Type == MessageTypeAckResponse {
+	m.AckID = ack
+	if m.Type == MessageTypeAckResponse {
 		if err != nil {
 			return nil, err
 		}
-		msg.Args = rest[1 : len(rest)-1]
-		return msg, nil
+		m.Args = rest[1 : len(rest)-1]
+		return m, nil
 	}
 
 	if err != nil {
-		msg.Type = MessageTypeEmit
+		m.Type = MessageTypeEmit
 		rest = data[2:]
 	}
 
-	msg.Event, msg.Args, err = getMethod(rest)
+	m.EventName, m.Args, err = getMethod(rest)
 	if err != nil {
 		return nil, err
 	}
 
-	return msg, nil
+	return m, nil
 }

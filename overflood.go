@@ -4,8 +4,10 @@ import (
 	"sync"
 )
 
-var overflooded = make(map[*Channel]struct{})
-var overfloodedMu sync.Mutex
+var (
+	overflooded   = make(map[*Channel]struct{})
+	overfloodedMu sync.Mutex
+)
 
 // CountOverfloodingChannels returns an amount of overflooding channels
 func CountOverfloodingChannels() int {

@@ -14,10 +14,7 @@ import (
 
 const (
 	queueBufferSize = 500
-)
-
-const (
-	HeaderForward = "X-Forwarded-For"
+	headerForward   = "X-Forwarded-For"
 )
 
 var (
@@ -80,9 +77,9 @@ func (c *Channel) stub() error { return c.close(nil) }
 func (c *Channel) close(e *event) error {
 	switch c.conn.(type) {
 	case *transport.PollingConnection:
-		logging.Log().Debug("close() type: PollingConnection")
+		logging.Log().Debug("Channel.close() type: PollingConnection")
 	case *transport.WebsocketConnection:
-		logging.Log().Debug("close() type: WebsocketConnection")
+		logging.Log().Debug("Channel.close() type: WebsocketConnection")
 	}
 
 	c.aliveMu.Lock()
@@ -102,7 +99,7 @@ func (c *Channel) close(e *event) error {
 
 	if e != nil { // close
 		c.outC <- protocol.MessageClose
-		e.callLoopEvent(c, OnDisconnection)
+		e.callHandler(c, OnDisconnection)
 	} else { // stub at transport upgrade
 		c.outC <- protocol.MessageStub
 	}
@@ -119,34 +116,34 @@ func (c *Channel) inLoop(e *event) error {
 	for {
 		message, err := c.conn.GetMessage()
 		if err != nil {
-			logging.Log().Debugf("inLoop(), c.conn.GetMessage() err: %v, message: %s", err, message)
+			logging.Log().Debugf("Channel.inLoop(), c.conn.GetMessage() err: %v, message: %s", err, message)
 			return c.close(e)
 		}
 
 		if message == transport.StopMessage {
-			logging.Log().Debug("inLoop(): StopMessage")
+			logging.Log().Debug("Channel.inLoop(): StopMessage")
 			return nil
 		}
 
 		decodedMessage, err := protocol.Decode(message)
 		if err != nil {
-			logging.Log().Debugf("inLoop() decoding err: %v, message: %s", err, message)
+			logging.Log().Debugf("Channel.inLoop() decoding err: %v, message: %s", err, message)
 			c.close(e)
 			return err
 		}
 
 		switch decodedMessage.Type {
 		case protocol.MessageTypeOpen:
-			logging.Log().Debugf("inLoop(), protocol.MessageTypeOpen, decodedMessage: %+v", decodedMessage)
+			logging.Log().Debugf("Channel.inLoop(), protocol.MessageTypeOpen, decodedMessage: %+v", decodedMessage)
 			if err := json.Unmarshal([]byte(decodedMessage.Source[1:]), &c.connHeader); err != nil {
 				c.close(e)
 			}
-			e.callLoopEvent(c, OnConnection)
+			e.callHandler(c, OnConnection)
 
 		case protocol.MessageTypePing:
-			logging.Log().Debugf("inLoop(), protocol.MessageTypePing, decodedMessage: %+v", decodedMessage)
+			logging.Log().Debugf("Channel.inLoop(), protocol.MessageTypePing, decodedMessage: %+v", decodedMessage)
 			if decodedMessage.Source == protocol.MessagePingProbe {
-				logging.Log().Debugf("inLoop(), decodedMessage.Source: %s", decodedMessage.Source)
+				logging.Log().Debugf("Channel.inLoop(), decodedMessage.Source: %s", decodedMessage.Source)
 				c.outC <- protocol.MessagePongProbe
 				c.upgradedC <- transport.UpgradedMessage
 			} else {
@@ -157,7 +154,7 @@ func (c *Channel) inLoop(e *event) error {
 		case protocol.MessageTypeBlank:
 		case protocol.MessageTypePong:
 		default:
-			go e.processIncomingEvent(c, decodedMessage)
+			go e.processIncoming(c, decodedMessage)
 		}
 	}
 
@@ -168,10 +165,10 @@ func (c *Channel) inLoop(e *event) error {
 func (c *Channel) outLoop(e *event) error {
 	for {
 		outBufferLen := len(c.outC)
-		logging.Log().Debug("outLoop(), outBufferLen:", outBufferLen)
+		logging.Log().Debug("Channel.outLoop(), outBufferLen:", outBufferLen)
 		switch {
 		case outBufferLen >= queueBufferSize-1:
-			logging.Log().Debug("outLoop(), outBufferLen >= queueBufferSize-1")
+			logging.Log().Debug("Channel.outLoop(), outBufferLen >= queueBufferSize-1")
 			return c.close(e)
 		case outBufferLen > int(queueBufferSize/2):
 			overfloodedMu.Lock()
@@ -183,14 +180,14 @@ func (c *Channel) outLoop(e *event) error {
 			overfloodedMu.Unlock()
 		}
 
-		msg := <-c.outC
+		m := <-c.outC
 
-		if msg == protocol.MessageClose || msg == protocol.MessageStub {
+		if m == protocol.MessageClose || m == protocol.MessageStub {
 			return nil
 		}
 
-		if err := c.conn.WriteMessage(msg); err != nil {
-			logging.Log().Debug("outLoop(), failed to c.conn.WriteMessage() with err:", err)
+		if err := c.conn.WriteMessage(m); err != nil {
+			logging.Log().Debug("Channel.outLoop(), failed to c.conn.WriteMessage() with err:", err)
 			return c.close(e)
 		}
 	}
@@ -215,7 +212,7 @@ func (c *Channel) send(m *protocol.Message, payload interface{}) error {
 	// preventing encoding/json "index out of range" panic
 	defer func() {
 		if r := recover(); r != nil {
-			logging.Log().Warn("socket.io send panic:", r)
+			logging.Log().Warn("Channel.send(): recovered from panic:", r)
 		}
 	}()
 
@@ -242,33 +239,33 @@ func (c *Channel) send(m *protocol.Message, payload interface{}) error {
 
 // Emit an asynchronous event with the given name and payload
 func (c *Channel) Emit(name string, payload interface{}) error {
-	message := &protocol.Message{Type: protocol.MessageTypeEmit, Event: name}
+	message := &protocol.Message{Type: protocol.MessageTypeEmit, EventName: name}
 	return c.send(message, payload)
 }
 
 // Ack a synchronous event with the given name and payload and wait for/receive the response
 func (c *Channel) Ack(name string, payload interface{}, timeout time.Duration) (string, error) {
-	msg := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckId: c.ack.nextId(), Event: name}
+	m := &protocol.Message{Type: protocol.MessageTypeAckRequest, AckID: c.ack.nextId(), EventName: name}
 
 	ackC := make(chan string)
-	c.ack.register(msg.AckId, ackC)
+	c.ack.register(m.AckID, ackC)
 
-	if err := c.send(msg, payload); err != nil {
-		c.ack.unregister(msg.AckId)
+	if err := c.send(m, payload); err != nil {
+		c.ack.unregister(m.AckID)
 	}
 
 	select {
 	case result := <-ackC:
 		return result, nil
 	case <-time.After(timeout):
-		c.ack.unregister(msg.AckId)
+		c.ack.unregister(m.AckID)
 		return "", ErrorSendTimeout
 	}
 }
 
 // IP returns an IP of the socket client
 func (c *Channel) IP() string {
-	forward := c.RequestHeader().Get(HeaderForward)
+	forward := c.RequestHeader().Get(headerForward)
 	if forward != "" {
 		return forward
 	}

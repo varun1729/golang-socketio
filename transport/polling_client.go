@@ -52,12 +52,12 @@ func (polling *PollingClientConnection) GetMessage() (string, error) {
 }
 
 // WriteMessage performs a POST request to send a message to server
-func (polling *PollingClientConnection) WriteMessage(message string) error {
-	msgToWrite := withLength(message)
-	logging.Log().Debug("PollingConnection.WriteMessage() fired, msgToWrite:", msgToWrite)
-	var jsonStr = []byte(msgToWrite)
+func (polling *PollingClientConnection) WriteMessage(m string) error {
+	mWrite := withLength(m)
+	logging.Log().Debug("PollingConnection.WriteMessage() fired, msgToWrite:", mWrite)
+	mJSON := []byte(mWrite)
 
-	resp, err := polling.client.Post(polling.url, "application/json", bytes.NewBuffer(jsonStr))
+	resp, err := polling.client.Post(polling.url, "application/json", bytes.NewBuffer(mJSON))
 	if err != nil {
 		logging.Log().Debug("PollingConnection.WriteMessage() error polling.client.Post():", err)
 		return err

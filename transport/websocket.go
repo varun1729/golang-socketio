@@ -75,9 +75,9 @@ func (ws *WebsocketConnection) GetMessage() (string, error) {
 // SetSid does nothing for the websocket transport, it's used only when transport changes (from)
 func (t *WebsocketTransport) SetSid(string, Connection) {}
 
-// WriteMessage message into a connection
-func (ws *WebsocketConnection) WriteMessage(message string) error {
-	logging.Log().Debug("WebsocketConnection.WriteMessage() fired with:", message)
+// WriteMessage message m into a connection
+func (ws *WebsocketConnection) WriteMessage(m string) error {
+	logging.Log().Debug("WebsocketConnection.WriteMessage() fired with:", m)
 	ws.socket.SetWriteDeadline(time.Now().Add(ws.transport.SendTimeout))
 
 	writer, err := ws.socket.NextWriter(websocket.TextMessage)
@@ -85,7 +85,7 @@ func (ws *WebsocketConnection) WriteMessage(message string) error {
 		return err
 	}
 
-	if _, err := writer.Write([]byte(message)); err != nil {
+	if _, err := writer.Write([]byte(m)); err != nil {
 		return err
 	}
 
