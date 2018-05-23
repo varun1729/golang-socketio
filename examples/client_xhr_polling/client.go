@@ -20,6 +20,8 @@ const (
 
 const defaultTimeout = time.Second * 30
 
+const serverPort = 3811
+
 func onConnectionHandler(c *gosocketio.Channel)    { log.Printf("Connected %s\n", c.Id()) }
 func onDisconnectionHandler(c *gosocketio.Channel) { log.Printf("Disconnected %s\n", c.Id()) }
 
@@ -48,7 +50,7 @@ func onSomeEventHandler(c *gosocketio.Channel, data interface{}) {
 
 func main() {
 	client, err := gosocketio.Dial(
-		gosocketio.AddrPolling("localhost", 3811, false),
+		gosocketio.AddrPolling("localhost", serverPort, false),
 		transport.DefaultPollingClientTransport(),
 	)
 	if err != nil {
