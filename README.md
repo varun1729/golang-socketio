@@ -5,6 +5,10 @@ This library was forked from github.com/graarh/golang-socketio
 It provides a simple Golang implementation of
 [socket.io](http://socket.io) client and server.
 
+The code was heavily refactored, also implemented XHR polling transport
+for client and server upgrade XHR -> websocket.
+
+**Pull requests appreciated**
 
 ## Usage examples
 
