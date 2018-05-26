@@ -98,7 +98,7 @@ func main() {
 	payloadToSend = model.Data{
 		EventName:         someEventName,
 		BroadcastRoomName: roomName,
-		Payload:           SomeEventPayload{7, "seven"},
+		Payload:           SomeEventPayload{8, "eight"},
 	}
 	sendResult, err = client.Ack(serverEventSend, payloadToSend, defaultTimeout)
 	if err != nil {
