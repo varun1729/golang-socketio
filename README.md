@@ -15,8 +15,9 @@ for client and server upgrade XHR -> websocket.
 Please observe the `examples` directory for usage examples:
 
 ```
-JavaScript client:    examples/assets/index.html
+JavaScript client:    examples/assets/index.html, serve it with:
 Go server:            go run examples/server/server.go
+
 Go client via WS:     go run examples/client_websocket/client.go
 Go client via XHR:    go run examples/client_xhr_polling/client.go
 ```
