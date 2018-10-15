@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"crypto/tls"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -21,7 +22,12 @@ const (
 )
 
 // WebsocketTransportParams is a parameters for getting non-default websocket transport
-type WebsocketTransportParams struct{ Headers http.Header }
+type WebsocketTransportParams struct {
+	Headers http.Header
+	//To provide custom TLS configurations.
+	//Like an insecure: skipVerify etc
+	TLSClientConfig *tls.Config
+}
 
 var (
 	errBinaryMessage     = errors.New("binary messages are not supported")
@@ -105,23 +111,26 @@ func (ws *WebsocketConnection) PingParams() (time.Duration, time.Duration) {
 
 // WebsocketTransport implements websocket transport
 type WebsocketTransport struct {
-	PingInterval   time.Duration
-	PingTimeout    time.Duration
-	ReceiveTimeout time.Duration
-	SendTimeout    time.Duration
-
-	BufferSize int
-	Headers    http.Header
+	PingInterval    time.Duration
+	PingTimeout     time.Duration
+	ReceiveTimeout  time.Duration
+	SendTimeout     time.Duration
+	BufferSize      int
+	Headers         http.Header
+	TLSClientConfig *tls.Config
 }
 
 // Connect to the given url
 func (t *WebsocketTransport) Connect(url string) (Connection, error) {
-	dialer := websocket.Dialer{}
+	//If the TLSClientConfig supplied was nil, it will continue to be so when Dial is called.
+	//The above implies that the default behavior will kick in when nil as promised in websocket.Dialer struct
+	dialer := websocket.Dialer{
+		TLSClientConfig: t.TLSClientConfig,
+	}
 	socket, _, err := dialer.Dial(url, t.Headers)
 	if err != nil {
 		return nil, err
 	}
-
 	return &WebsocketConnection{socket, t}, nil
 }
 
@@ -154,8 +163,7 @@ func DefaultWebsocketTransport() *WebsocketTransport {
 		PingTimeout:    wsDefaultPingTimeout,
 		ReceiveTimeout: wsDefaultReceiveTimeout,
 		SendTimeout:    wsDefaultSendTimeout,
-
-		BufferSize: wsDefaultBufferSize,
+		BufferSize:     wsDefaultBufferSize,
 	}
 }
 
@@ -163,5 +171,6 @@ func DefaultWebsocketTransport() *WebsocketTransport {
 func NewWebsocketTransport(params WebsocketTransportParams) *WebsocketTransport {
 	tr := DefaultWebsocketTransport()
 	tr.Headers = params.Headers
+	tr.TLSClientConfig = params.TLSClientConfig
 	return tr
 }
