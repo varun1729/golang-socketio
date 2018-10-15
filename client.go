@@ -69,4 +69,8 @@ func Dial(addr string, tr transport.Transport) (*Client, error) {
 }
 
 // Close client connection
-func (c *Client) Close() { c.Channel.close(c.event) }
+func (c *Client) Close() { 
+	if c != nil {
+		c.Channel.close(c.event) 
+	}
+}
