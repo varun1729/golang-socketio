@@ -23,9 +23,7 @@ const (
 
 // WebsocketTransportParams is a parameters for getting non-default websocket transport
 type WebsocketTransportParams struct {
-	Headers http.Header
-	//To provide custom TLS configurations.
-	//Like an insecure: skipVerify etc
+	Headers         http.Header
 	TLSClientConfig *tls.Config
 }
 
@@ -115,6 +113,7 @@ type WebsocketTransport struct {
 	PingTimeout     time.Duration
 	ReceiveTimeout  time.Duration
 	SendTimeout     time.Duration
+	
 	BufferSize      int
 	Headers         http.Header
 	TLSClientConfig *tls.Config
@@ -122,11 +121,7 @@ type WebsocketTransport struct {
 
 // Connect to the given url
 func (t *WebsocketTransport) Connect(url string) (Connection, error) {
-	//If the TLSClientConfig supplied was nil, it will continue to be so when Dial is called.
-	//The above implies that the default behavior will kick in when nil as promised in websocket.Dialer struct
-	dialer := websocket.Dialer{
-		TLSClientConfig: t.TLSClientConfig,
-	}
+	dialer := websocket.Dialer{TLSClientConfig: t.TLSClientConfig}
 	socket, _, err := dialer.Dial(url, t.Headers)
 	if err != nil {
 		return nil, err
